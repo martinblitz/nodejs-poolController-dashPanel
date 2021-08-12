@@ -7,7 +7,7 @@ class Config {
     private _cfg: any;
     private _isInitialized: boolean = false;
     constructor() {
-        this.cfgPath = path.posix.join(process.cwd(), "/config.json");
+        this.cfgPath = path.posix.join(process.cwd(), "/config/config.json");
         // RKS 05-18-20: This originally had multiple points of failure where it was not in the try/catch.
         try {
             this._cfg = fs.existsSync(this.cfgPath) ? JSON.parse(fs.readFileSync(this.cfgPath, "utf8")) : {};
