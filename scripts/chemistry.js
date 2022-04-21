@@ -1,4 +1,6 @@
-﻿(function ($) {
+﻿
+
+(function ($) {
     $.widget("pic.chemistry", {
         options: {},
         _create: function () {
@@ -52,7 +54,6 @@
                     $('<div></div>').appendTo(el).chemController(data.chemControllers[i]);
                 }
             }
-
             else el.hide();
         }
     });
@@ -79,7 +80,7 @@
                     sc.show();
                     // if (o.superChlorTimer) this.stopCountdownSuperChlor();
                     if (data.superChlorRemaining > 0) {
-                        if (o.superChlorTimer === null || typeof o.superChlorTimer === 'undefined')  o.superChlorTimer = setInterval(function () { self.countdownSuperChlor(); }, 1000);
+                        if (o.superChlorTimer === null || typeof o.superChlorTimer === 'undefined') o.superChlorTimer = setInterval(function () { self.countdownSuperChlor(); }, 1000);
                         el.find('div.picSuperChlorBtn label.picSuperChlor').text('Cancel Chlorinate');
                         el.find('div.picSuperChlorBtn div.picIndicator').attr('data-status', 'on');
                     }
@@ -95,9 +96,9 @@
                 else el.find('div.picSuperChlorBtn').show();
                 // due to granularity of chlor time remaining, if we are <1 min off then don't reset the counter.
                 // this caused a small but annoying bug where if you opened the chlorinator settings it would reset the counter to the prev value
-                if (data.superChlorRemaining - el.data('remaining')  <= 0 || data.superChlorRemaining - el.data('remaining') >= 60 || isNaN(el.data('remaining'))) {
+                if (data.superChlorRemaining - el.data('remaining') <= 0 || data.superChlorRemaining - el.data('remaining') >= 60 || isNaN(el.data('remaining'))) {
                     el.data('remaining', data.superChlorRemaining);
-                } 
+                }
                 if (typeof data.status !== 'undefined') el.attr('data-status', data.status.name);
                 else el.attr('data-status', '');
             }
@@ -177,8 +178,9 @@
                                     clearTimeout(o.putChlorValuesTimer);
                                     o.putChlorValuesTimer = null;
                                 }
-                                o.putChlorValuesTimer = setTimeout(function () { self.putChlorValues() }, 1500); 
+                                o.putChlorValuesTimer = setTimeout(function () { self.putChlorValues() }, 1500);
                             });
+                            if (data.lockSetpoints) { $('div.picValueSpinner[data-bind="poolSetpoint"]').addClass('disabled'); }
                         }
                         if (data.body.val === 32 || data.body.val === 1) {
                             // Add in the spa setpoint.
@@ -198,8 +200,9 @@
                                     clearTimeout(o.putChlorValuesTimer);
                                     o.putChlorValuesTimer = null;
                                 }
-                                o.putChlorValuesTimer = setTimeout(function () { self.putChlorValues() }, 1500); 
+                                o.putChlorValuesTimer = setTimeout(function () { self.putChlorValues() }, 1500);
                             });
+                            if (data.lockSetpoints) { $('div.picValueSpinner[data-bind="spaSetpoint"]').addClass('disabled'); }
                         }
 
                         //let divSuperChlorHours = $('<div class="picSuperChlorHours picSetpoint"><label class="picInline-label picSetpointText">Super Chlorinate</label><div class="picValueSpinner" data-bind="superChlorHours"></div><label class="picUnits">Hours</label></div>');
@@ -219,7 +222,7 @@
                                     clearTimeout(o.putChlorValuesTimer);
                                     o.putChlorValuesTimer = null;
                                 }
-                                o.putChlorValuesTimer = setTimeout(function () { self.putChlorValues() }, 1500); 
+                                o.putChlorValuesTimer = setTimeout(function () { self.putChlorValues() }, 1500);
                             });
 
                         // Add in the super chlorinate button.
@@ -230,9 +233,9 @@
                         toggle.appendTo(btn);
                         toggle.toggleButton();
                         // if current countdown timer is between 0-60s, don't reset the display
-                        if (data.superChlorRemaining - el.data('remaining')  > 0 && data.superChlorRemaining - el.data('remaining') < 60) {
+                        if (data.superChlorRemaining - el.data('remaining') > 0 && data.superChlorRemaining - el.data('remaining') < 60) {
                             data.superChlorRemaining = el.data('remaining');
-                        } 
+                        }
                         let lbl = $('<div><div><label class="picSuperChlor">Super Chlorinate</label></div><div class="picSuperChlorRemaining"><span class="picSuperChlorRemaining" data-bind="superChlorRemaining" data-fmttype="duration"></span></div></div>');
                         lbl.appendTo(btn);
                         btn.on('click', function (e) {
@@ -279,7 +282,7 @@
         },
         setDosingStatus: function (stat, chem, type) {
             var self = this, o = self.options, el = self.element;
-            if (typeof chem === 'undefined' || typeof chem.dosingStatus === 'undefined')
+            if (typeof chem === 'undefined' || typeof chem.dosingStatus === 'undefined' || chem.enabled === false)
                 stat.hide();
             else {
                 switch (chem.dosingStatus.name) {
@@ -288,11 +291,19 @@
                         var vol = !isNaN(chem.doseVolume) ? chem.doseVolume : 0;
                         var volDosed = !isNaN(chem.dosingVolumeRemaining) ? vol - chem.dosingVolumeRemaining : 0;
                         if (chem.delayTimeRemaining > 0) {
-                            $('<span></span>').appendTo(stat).text(`Dosing ${type}: ${vol.format('#,##0')}mL`);
+                            if (type === 'ORP' && chem.useChlorinator) {
+                                $('<span></span>').appendTo(stat).text(`Chlorinating: ${vol.format('#,#0.####0')}lbs`);
+                            }
+                            else
+                                $('<span></span>').appendTo(stat).text(`Dosing ${type}: ${vol.format('#,##0')}mL`);
                             $('<span></span>').appendTo(stat).css({ float: 'right' }).text(`Delay: ${dataBinder.formatDuration(chem.delayTimeRemaining)}`);
                         }
                         else {
-                            $('<span></span>').appendTo(stat).text(`Dosing ${type}: ${volDosed.format('#,##0')}mL of ${vol.format('#,##0')}mL - ${dataBinder.formatDuration(chem.dosingTimeRemaining)}`);
+                            if (type === 'ORP' && chem.useChlorinator) {
+                                $('<span></span>').appendTo(stat).text(`Chlorinating: ${volDosed.format('#,#0.####0')}lbs of ${vol.format('#,#0.####0')}lbs - ${dataBinder.formatDuration(chem.dosingTimeRemaining)}`);
+                            }
+                            else
+                                $('<span></span>').appendTo(stat).text(`Dosing ${type}: ${volDosed.format('#,##0')}mL of ${vol.format('#,##0')}mL - ${dataBinder.formatDuration(chem.dosingTimeRemaining)}`);
                         }
                         stat.show();
                         break;
@@ -314,6 +325,7 @@
             if (typeof data.status !== 'undefined' && data.status.val > 0) arr.push(data.status);
             if (typeof data.alarms !== 'undefined') {
                 var alarms = data.alarms;
+                if (typeof alarms.freezeProtect !== 'undefined' && alarms.freezeProtect.val > 0) arr.push(alarms.freezeProtect);
                 if (typeof alarms.flowSensorFault !== 'undefined' && alarms.flowSensorFault.val > 0) arr.push(alarms.flowSensorFault);
                 if (typeof alarms.pHPumpFault !== 'undefined' && alarms.pHPumpFault.val > 0) arr.push(alarms.pHPumpFault);
                 if (typeof alarms.pHProbeFault !== 'undefined' && alarms.pHProbeFault.val > 0) arr.push(alarms.pHProbeFault);
@@ -327,7 +339,6 @@
                 if (typeof alarms.orp !== 'undefined' && alarms.orp.val > 0) arr.push(alarms.orp);
                 if (typeof alarms.orpTank !== 'undefined' && alarms.orpTank.val > 0) arr.push(alarms.orpTank);
             }
-
             if (typeof data.warnings !== 'undefined') {
                 var warns = data.warnings;
                 if (typeof warns.waterChemistry !== 'undefined' && warns.waterChemistry.val > 0) arr.push(warns.waterChemistry);
@@ -415,7 +426,7 @@
             $('<span></span>').addClass('phLevel').attr('data-bind', 'orp.level').attr('data-fmttype', 'number').attr('data-fmtmask', '#,##0.0').attr('data-emptymask', '-.-').appendTo(line);
             span = $('<span></span>').addClass('lsiIndex').addClass('picData').appendTo(line);
             $('<label></label>').addClass('picInline-label').addClass('siTitle').text('Bal').appendTo(line);
-            $('<span></span>').addClass('saturationIndex').attr('data-bind', 'saturationIndex').attr('data-fmttype', 'number').attr('data-fmtmask', '#,##0.#').attr('data-emptymask', '-.-').appendTo(line);
+            $('<span></span>').addClass('saturationIndex').attr('data-bind', 'saturationIndex').attr('data-fmttype', 'number').attr('data-fmtmask', '#,##0.0#').attr('data-emptymask', '-.-').appendTo(line);
 
             //$('<span class="orpLevel picData"><label class="picInline-label">ORP</label><span class="orpLevel" data-bind="orp.probe.level"></span></span>').appendTo(line);
             //$('<span class="lsiIndex picData"><label class="picInline-label">Bal</label><span class="saturationIndex" data-bind="saturationIndex"></span></span>').appendTo(line);
@@ -438,14 +449,14 @@
         setEquipmentData: function (data) {
             var self = this, o = self.options, el = self.element;
             //console.log(data);
-            el.find('div.picChemLevel[data-chemtype="pH"]').each(function () {
-                this.val(data.ph.level);
-            });
-            el.find('div.picChemLevel[data-chemtype="ORP"]').each(function () {
-                this.val(data.orp.level);
-            });
+            el.find('div.picChemLevel[data-chemtype="pH"]').each(function () { this.val(data.ph.level); });
+            el.find('div.picChemLevel[data-chemtype="ORP"]').each(function () { this.val(data.orp.level); });
+            if (typeof data.orp.pump.type !== 'undefined' && typeof data.ph.pump.type !== 'undefined') {
+                if (data.orp.doserType.val === 0 && data.ph.doserType.val === 0) el.find('div.chem-daily').hide();
+                else el.find('div.chem-daily').show();
+            }
             if (typeof data.orp.pump.type !== 'undefined') {
-                if ((data.orp.enabled && data.orp.pump.type.name !== 'none' && data.orp.useChlorinator !== true) || data.type.name === 'intellichem') {
+                if ((data.orp.enabled && (data.orp.pump.type.name !== 'none' || data.orp.doserType.val === 1) && data.orp.useChlorinator !== true)) {
                     el.find('div.picChemTank[data-chemtype="orp"]').show();
                     el.find('div.daily-dose[data-chemtype="orp"]').show();
                 }
@@ -455,7 +466,7 @@
                 }
             }
             if (typeof data.ph.pump.type !== 'undefined') {
-                if ((data.ph.enabled && data.ph.pump.type.name !== 'none') || data.type.name === 'intellichem') {
+                if ((data.ph.enabled && (data.ph.pump.type.name !== 'none' || data.orp.doserType.val === 1))) {
                     el.find('div.picChemTank[data-chemtype="acid"]').show();
                     el.find('div.daily-dose[data-chemtype="acid"]').show();
                 }
@@ -465,9 +476,10 @@
                 }
             }
             let siTitle = typeof data.siCalcType === 'undefined' || data.siCalcType.name === 'undefined' ? 'Water Balance' : data.siCalcType.name === 'lsi' ? 'LSI Balance' : 'CSI Balance';
-            el.find('div.chem-balance-label').each(function () {
-                $(this).text(siTitle);
-            });
+            el.find('div.chem-balance-label').text(siTitle);
+            //el.find('div.chem-balance-label').each(function () {
+            //    $(this).text(siTitle);
+            //});
             // If this is IntelliChem then all the manual dosing buttons need to go away.  We don't have
             // control over this for IntelliChem.
             if (typeof data.type === 'undefined' || data.type.name === 'intellichem') {
@@ -740,7 +752,7 @@
                 inputAttrs: { style: { width: '3rem' } }
             }).on('change', function (e) {
 
-                });
+            });
             $('<div></div>').appendTo(line).valueSpinner({
                 canEdit: true, labelText: '', binding: 'minutes', min: 0, max: 59, step: 1,
                 fmtMask: '#,##0', units: 'min',
@@ -833,7 +845,7 @@
                         var tabPh = tabBar[0].addTab({ id: 'tabPhDoses', text: `${o.ph.chemType} Doses` });
                         $('<div></div>').appendTo(tabPh).pnlChemDoseHistory({
                             id: o.id,
-                            chemType:'pH',
+                            chemType: 'pH',
                             chemical: o.ph,
                             history: h.ph
                         });
@@ -842,7 +854,7 @@
                         var tabOrp = tabBar[0].addTab({ id: 'tabOrpDoses', text: `${o.orp.chemType} Doses` });
                         $('<div></div>').appendTo(tabOrp).pnlChemDoseHistory({
                             id: o.id,
-                            chemType:'ORP',
+                            chemType: 'ORP',
                             chemical: o.orp,
                             history: h.orp
                         });
@@ -865,13 +877,13 @@
             var type = typeof data !== 'undefined' && typeof data.type !== 'undefined' ? data.type : { val: 0 };
             var phRange = type.ph || { min: 7.2, max: 7.6 };
 
-            $('<div></div>').appendTo(divLine).valueSpinner({ canEdit: true, labelText: 'pH', binding: 'ph.setpoint', min: phRange.min, max: phRange.max, step: .1, units: '', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginRight: '.25rem' } } })
+            $('<div></div>').appendTo(divLine).valueSpinner({ canEdit: true, labelText: 'pH', binding: 'ph.setpoint', min: phRange.min, max: phRange.max, step: .1, units: '', inputAttrs: { style: { width: '3.5rem' } }, labelAttrs: { style: { marginRight: '.25rem' } } })
                 .on('change', function (e) {
                     el.find('div.picChemLevel[data-chemtype=pH').each(function () {
                         this.target(e.value);
                     });
                 });
-            $('<div></div>').appendTo(divLine).valueSpinner({ canEdit: true, labelText: 'ORP', binding: 'orp.setpoint', min: 400, max: 800, step: 10, units: 'mV', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginRight: '.25rem', marginLeft: '2rem' } } })
+            $('<div></div>').appendTo(divLine).valueSpinner({ canEdit: true, labelText: 'ORP', binding: 'orp.setpoint', min: 400, max: 800, step: 10, units: 'mV', inputAttrs: { style: { width: '3.5rem' } }, labelAttrs: { style: { marginRight: '.25rem', marginLeft: '1.5rem' } } })
                 .on('change', function (e) {
                     el.find('div.picChemLevel[data-chemtype=ORP').each(function () {
                         this.target(e.value);
@@ -894,7 +906,7 @@
             divLine = $('<div></div>').css({ display: 'inline-block', verticalAlign: 'top' }).appendTo(grpLevels);
             var divVal = $('<div></div>').appendTo(divLine).css({ display: 'inline-block', verticalAlign: 'top', textAlign: 'center' });
             $('<div></div>').addClass('chem-balance-label').text('Water Balance').appendTo(divVal);
-            $('<div></div>').addClass('chem-balance-value').attr('data-bind', 'saturationIndex').attr('data-fmtmask', '#,##0.0').attr('data-fmttype', 'number').appendTo(divVal);
+            $('<div></div>').addClass('chem-balance-value').attr('data-bind', 'saturationIndex').attr('data-fmtmask', '#,##0.0#').attr('data-fmttype', 'number').appendTo(divVal);
             var divTotal = $('<div></div>').appendTo(divVal).addClass('chem-daily').addClass('ph').css({ textAlign: 'left' }).on('click', () => { self._openHistoryDialog(); });
 
             $('<div></div>').appendTo(divTotal).text('Dosed last 24hrs').css({ fontSize: '10pt', lineHeight: '1' });
@@ -918,7 +930,7 @@
                     self._createTankAttributesDialog('ORP', $(evt.currentTarget));
                 }).hide();
             divLine = $('<div></div>').appendTo(grpLevels).css({ textAlign: 'center' });
-            if (data.ph.enabled === true && data.ph.pump.type.val !== 0) {
+            if (data.ph.enabled === true && data.ph.pump.type.val !== 0 && data.ph.doserType.val !== 0) {
                 var divBtnAcidCont = $('<div></div>').appendTo(divLine).addClass('divDoseOrp').css({ display: 'inline-block' });
                 $('<div></div>').appendTo(divBtnAcidCont).actionButton({ id: 'btnDoseAcid', text: 'Dose Acid', icon: '<i class="fas fa-fill-drip"></i>' }).css({ width: '9rem', textAlign: 'left' })
                     .on('click', function (evt) {
@@ -938,7 +950,7 @@
                     }).hide();
 
             }
-            if (data.orp.enabled === true && data.orp.pump.type.val !== 0 && data.orp.useChlorinator !== true) {
+            if (data.orp.enabled === true && data.orp.pump.type.val !== 0 && data.orp.useChlorinator !== true && data.orp.doserType.val !== 0) {
                 var divBtnOrpCont = $('<div></div>').appendTo(divLine).addClass('divDoseOrp').css({ display: 'inline-block' });
                 $('<div></div>').appendTo(divBtnOrpCont).actionButton({ id: 'btnDoseOrp', text: 'Dose Chlorine', icon: '<i class="fas fa-fill-drip"></i>' }).css({ width: '9rem', textAlign: 'left' })
                     .on('click', function (evt) {
@@ -1015,14 +1027,14 @@
                         style: { width: '97px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
                     },
                     {
-                        binding: 'timeDosed', text: 'Duration', fmtType: 'duration', fmtMask: '#', cellStyle: { textAlign: 'right', width: '97px' },
-                        style: { width: '97px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+                        binding: 'timeDosed', text: 'Duration', fmtType: 'duration', fmtMask: '#', cellStyle: { textAlign: 'right', width: '77px' },
+                        style: { width: '77px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
                     },
                     {
                         binding: 'volumeDosed', fmtType: 'number', fmtMask: '#,##0.00', text: 'Dosed', cellStyle: { textAlign: 'right', width: '57px' },
                         style: { width: '57px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
                     },
-                    { binding: 'status', text: 'Status', style: { width: '97px' }, cellStyle: { width: '97px' } }
+                    { binding: 'status', text: 'Status', style: { width: '117px' }, cellStyle: { width: '117px' } }
                 ]
             }).css({ width: '363px' });
             sel.find('div.slist-body').css({ fontSize: '.8rem', maxHeight: '97px', overflowY: 'auto' });

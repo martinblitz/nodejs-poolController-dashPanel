@@ -13,7 +13,7 @@
                 console.log(opts);
                 var pumps = opts.pumps;
                 for (var i = 0; i < pumps.length; i++) {
-                    $('<div></div>').appendTo(el).pnlPumpConfig({ pumpTypes: opts.pumpTypes, maxPumps: opts.maxPumps, pumpUnits: opts.pumpUnits, circuits: opts.circuits, bodies: opts.bodies, models:opts.models, servers: opts.servers })[0].dataBind(pumps[i]);
+                    $('<div></div>').appendTo(el).pnlPumpConfig({ rs485ports: opts.rs485ports, pumpTypes: opts.pumpTypes, maxPumps: opts.maxPumps, pumpUnits: opts.pumpUnits, circuits: opts.circuits, bodies: opts.bodies, models: opts.models, servers: opts.servers })[0].dataBind(pumps[i]);
                 }
                 var btnPnl = $('<div class="picBtnPanel btn-panel"></div>').appendTo(el);
                 var btnAdd = $('<div></div>').appendTo(btnPnl).actionButton({ text: 'Add Pump', icon: '<i class="fas fa-plus" ></i>' });
@@ -21,10 +21,10 @@
                     var groups = el.find('div.picConfigCategory.cfgPump');
                     //$(this).addClass('disabled');
                     //$(this).find('i').addClass('burst-animated');
-                    var pnl = $('<div></div>').insertBefore(btnPnl).pnlPumpConfig({ pumpTypes: opts.pumpTypes, maxPumps: opts.maxPumps, pumpUnits: opts.pumpUnits, circuits: opts.circuits, bodies: opts.bodies, models: opts.models, servers: opts.servers });
+                    var pnl = $('<div></div>').insertBefore(btnPnl).pnlPumpConfig({ rs485ports: opts.rs485ports, pumpTypes: opts.pumpTypes, maxPumps: opts.maxPumps, pumpUnits: opts.pumpUnits, circuits: opts.circuits, bodies: opts.bodies, models: opts.models, servers: opts.servers });
                     var pt = opts.pumpTypes[0];
                     pnl[0].dataBind({
-                        id: -1, name: 'Pump ' + (groups.length + 1),
+                        id: -1, name: 'Pump ' + (groups.length + 1), portId: 0,                        
                         type: pt.val, circuits: [],
                         minFlow: 0, maxFlow: 130,
                         minSpeed: 0, maxSpeed: 3450, primingTime: 0,
@@ -47,12 +47,13 @@
         },
         _buildControls: function () {
             var self = this, o = self.options, el = self.element;
+            var isNixie = $('body').attr('data-controllertype') === 'nixie';
             el.empty();
             el.addClass('picConfigCategory cfgPump');
             var binding = '';
             var acc = $('<div></div>').appendTo(el).accordian({
                 columns: [{ binding: 'name', glyph: 'fas fa-cog', style: { width: '9rem' } },
-                { binding: 'type', style: { width: '9rem' } },
+                    { binding: 'type', style: { width: '12rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' } },
                 { binding: 'circuits', style: { width: '15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle', textAlign: 'center' } }]
             });
             var pnl = acc.find('div.picAccordian-contents');
@@ -65,17 +66,27 @@
                 columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'name', hidden: true, text: 'Code', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Pump Type', style: { whiteSpace: 'nowrap' } }],
                 items: o.pumpTypes, inputAttrs: { style: { width: '9rem' } }, labelAttrs: { style: { marginLeft: '.25rem' } }
             });
+            $('<div></div>').appendTo(line).pickList({
+                required: true, bindColumn: 0, displayColumn: 1, labelText: 'Body', binding: binding + 'body',
+                columns: [{ binding: 'val', hidden: true, text: 'val', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Body', style: { whiteSpace: 'nowrap' } }],
+                items: o.bodies, inputAttrs: { style: { width: '5rem' } }, labelAttrs: { style: { marginLeft: '.25rem' } }
+            });
+            if (isNixie && o.rs485ports.length > 1) {
+                line = $('<div></div>').appendTo(pnl);
+            }
+            let ports = $('<div></div>').appendTo(line).pickList({
+                required: true, bindColumn: 0, displayColumn: 1, labelText: 'Port', binding: binding + 'portId', value: 0,
+                columns: [{ binding: 'portId', hidden: true, text: 'portId', style: { whiteSpace: 'nowrap' } }, { binding: 'name', text: 'Port', style: { whiteSpace: 'nowrap' } }],
+                items: o.rs485ports, inputAttrs: { style: { width: '5rem' } }, labelAttrs: { style: { width: '3.25rem' } }
+            });
+            if (!isNixie) ports.hide();
+
             var addrs = [];
             for (var k = 0; k < o.maxPumps; k++) addrs.push({ val: k + 96, desc: k + 1 });
             $('<div></div>').appendTo(line).pickList({
                 required: true, bindColumn: 0, displayColumn: 1, labelText: 'Address', binding: binding + 'address',
                 columns: [{ binding: 'val', hidden: true, text: 'val', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Address', style: { whiteSpace: 'nowrap' } }],
                 items: addrs, inputAttrs: { style: { width: '2rem' } }, labelAttrs: { style: { marginLeft: '.25rem' } }
-            });
-            $('<div></div>').appendTo(line).pickList({
-                required: true, bindColumn: 0, displayColumn: 1, labelText: 'Body', binding: binding + 'body',
-                columns: [{ binding: 'val', hidden: true, text: 'val', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Body', style: { whiteSpace: 'nowrap' } }],
-                items: o.bodies, inputAttrs: { style: { width: '5rem' } }, labelAttrs: { style: { marginLeft: '.25rem' } }
             });
             line = $('<div></div>').appendTo(pnl);
             $('<div></div>').appendTo(line).pickList({
@@ -201,7 +212,7 @@
                 $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Maximum Speed', binding: binding + 'maxSpeed', min: type.minSpeed, max: type.maxSpeed, step: 10, units: 'rpm', inputAttrs: { maxlength: 5 }, labelAttrs: { style: lblStyle }, canEdit: true });
             else
                 $('<input type="hidden" data-datatype="int"></input>').attr('data-bind', 'maxSpeed').appendTo(line);
-            line = $('<div></div>').appendTo(pnl);
+            line = $('<div></div>').appendTo(pnl).css({ marginLeft: '3px' });
             if (typeof type.minFlow !== 'undefined')
                 $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Minimum Flow', binding: binding + 'minFlow', min: type.minFlow, max: type.maxFlow, step: 1, units: 'gpm', style: { width: '17rem' }, inputAttrs: { maxlength: 5 }, labelAttrs: { style: lblStyle }, canEdit: true });
             else
@@ -239,13 +250,10 @@
             clist.on('selchanged', 'div.picPickList[data-bind$=units]', function (e) {
                 if (typeof e.oldItem !== 'undefined') {
                     var pmp = dataBinder.fromElement(el);
-                    console.log(e);
-                    console.log(pmp);
                     self.dataBind(pmp);
                 }
             });
             tab = tabs[0].addTab({ id: 'tabPumpRelays', text: 'Relays' });
-            console.log(type);
             tabs[0].showTab('tabPumpRelays', type.maxRelays > 0);
             if (!(type.maxCircuits > 0)) tabs[0].selectTabById('tabPumpRelays');
             if (!(type.maxCircuits > 0) && !(type.maxRelays > 0)) tabs.hide();
@@ -259,9 +267,10 @@
                 $('<hr></hr>').appendTo(pnlRelays).css({ margin: '3px' });
                 for (var i = 0; i < type.maxRelays; i++) {
                     var l = $('<div></div>').appendTo(pnlRelays).addClass('pmprelay-line').attr('data-relayid', i + 1);
+                    let rly = typeof type.relays !== 'undefined' ? type.relays.find(elem => elem.id === i + 1) || { id: i + 1, name: `Program #${i + 1}` } : { id: i + 1, name: `Program #${i + 1}` };
                     //if (i !== 0) $('<hr></hr>').appendTo(l).css({ margin: '3px' });
                     $('<input type="hidden"></input>').appendTo(l).attr('data-datatype', 'int').attr('data-bind', `relays[${i}].id`).val(i + 1);
-                    var relayName = `Program #${i + 1}`;
+                    var relayName = rly.name;
                     if (type.maxRelays === 1) relayName = 'Pump';
                     else if (type.maxRelays === 2) relayName = i === 0 ? 'Low Speed' : 'High Speed';
                     $('<span></span>').appendTo(l).text(relayName).css({ display: 'inline-block', width: '7rem' });
@@ -332,7 +341,7 @@
             else if (type.maxRelays > 0) {
                 $('<div></div>').appendTo(line).valueSpinner({
                     labelText: unitsType,
-                    binding: binding + 'relay', min: 1, max: type.maxRelays, step: 1,
+                    binding: binding + 'relay', min: 1, max: type.maxSpeeds || type.maxRelays, step: 1,
                     value: circ.relay,
                     style: { marginLeft: '.25rem' },
                     inputAttrs: { maxlength: 5 },
@@ -349,7 +358,7 @@
                     labelText: 'Units', binding: binding + 'units', value: circ.units,
                     columns: [{ binding: 'val', hidden:true, text: 'value', style: { whiteSpace: 'nowrap' } }, { binding: 'name', text: 'Units', style: { whiteSpace: 'nowrap' } }],
                     style: { marginLeft: '.25rem' },
-                    items: o.pumpUnits, inputAttrs: { style: { width: '2.5rem' } }, labelAttrs: { style: { marginLeft: '.25rem', display: 'none' } }
+                    items: o.pumpUnits, inputAttrs: { style: { width: '2.75rem' } }, labelAttrs: { style: { marginLeft: '.25rem', display: 'none' } }
                 }).appendTo(line);
             }
             else
@@ -359,10 +368,10 @@
         dataBind: function (obj) {
             var self = this, o = self.options, el = self.element;
             var acc = el.find('div.picAccordian:first');
-            var type = o.pumpTypes.find(elem => elem.val === obj.type);
+            var type = o.pumpTypes.find(elem => elem.val === obj.type) || { val: -1, name: 'invalid', desc: 'Unknown Type' };
             var cols = acc[0].columns();
+            var isNixie = $('body').attr('data-controllertype') === 'nixie';
             self._resetPumpPanel(type);
-            console.log(o);
             var circuits = '';
             if (typeof obj.circuits !== 'undefined') {
                 for (var i = 0; i < obj.circuits.length; i++) {
@@ -392,6 +401,9 @@
             if (typeof type !== 'undefined') {
                 cols[1].elText().text(type.desc);
                 ddAddr[0].required(type.hasAddress);
+                if (obj.portId !== 0 && type.hasAddress) el.find('div[data-bind^=portId]').show(); // Let the user fix any mistakes.
+                else if (!type.hasAddress || !isNixie || typeof o.rs485ports === 'undefined' || o.rs485ports.length === 1) el.find('div[data-bind^=portId]').hide();
+                else el.find('div[data-bind^=portId]').show();
                 if (type.hasAddress) ddAddr.show();
                 else ddAddr.hide();
                 ddBody[0].required(type.hasBody);

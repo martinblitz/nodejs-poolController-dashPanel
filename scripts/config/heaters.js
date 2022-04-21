@@ -53,7 +53,7 @@
                 columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'name', hidden: true, text: 'Code', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Heater Type', style: { whiteSpace: 'nowrap' } }],
                 items: o.heaterTypes, inputAttrs: { style: { width: '7.7rem' } }, labelAttrs: { style: { marginLeft: '.25rem' } }
             }).on('selchanged', function (evt) { self._setOptionsPanel(evt.newItem); });
-            $('<div></div>').appendTo(line).checkbox({ labelText: 'Virtual Controller', binding: 'isVirtual' }).attr('title', 'Check this only if the heater is not being controlled by\r\na pool automation system.').hide();
+            // $('<div></div>').appendTo(line).checkbox({ labelText: 'Virtual Controller', binding: 'isVirtual' }).attr('title', 'Check this only if the heater is not being controlled by\r\na pool automation system.').hide();
             $('<div></div>').appendTo(line).pickList({
                 required: true,
                 bindColumn: 0, displayColumn: 2, labelText: 'Body', binding: binding + 'body',
@@ -171,7 +171,7 @@
             cols[1].elText().text(htype.desc);
             cols[2].elText().text(body.desc);
             el.find('div[data-bind="type"]').each(function () { this.disabled(hasId); });
-            el.find('div[data-bind="isVirtual"]').each(function () { this.disabled(hasId); });
+            // el.find('div[data-bind="isVirtual"]').each(function () { this.disabled(hasId); });
             self._setOptionsPanel(htype);
             if (obj.master === 1) el.find('div.pnlDeviceBinding').show();
             else el.find('div.pnlDeviceBinding').hide();
@@ -210,11 +210,21 @@
         },
         _buildControls: function () {
             var self = this, o = self.options, el = self.element;
+            var controller = $('body').attr('data-controllertype');
             el.empty();
             el.addClass('pnl-gas-heater');
             var binding = '';
             var line = $('<div></div>').appendTo(el);
-            $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Cooldown Delay', binding: binding + 'cooldownDelay', min: 1, max: 10, step: 1, units: 'min', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft: '1rem', marginRight: '.25rem' } } });
+            // Alright if this is a Nixie heater then we should allow a few more options.
+            if (controller === 'nixie') {
+                $('<div></div>').appendTo(line).valueSpinner({ canEdit: true, labelText: 'Cooldown Delay', binding: binding + 'cooldownDelay', min: 0, max: 10, step: 1, fmtMask: '#,##0.#', units: 'min', inputAttrs: { style: { width: '3.5rem' } }, labelAttrs: { style: { width: '7.5rem', marginLeft: '1rem', marginRight: '.25rem' } } });
+                line = $('<div></div>').appendTo(el);
+                $('<div></div>').appendTo(line).valueSpinner({ value: 1, canEdit: true, labelText: 'Stop Temp Delta', binding: binding + 'stopTempDelta', min: 0, max: 10, step: 1, fmtMask: '#,##0.#', units: '&deg' + o.tempUnits.name, inputAttrs: { style: { width: '3.5rem' } }, labelAttrs: { style: { width: '7.5rem', marginLeft: '1rem', marginRight: '.25rem' } } });
+                $('<div></div>').appendTo(line).valueSpinner({ value: 1, canEdit: true, labelText: 'Minimum Cycle Time', binding: binding + 'minCycleTime', min: 0, max: 30, step: 1, fmtMask: '#,##0.#', units: 'min', inputAttrs: { style: { width: '3.5rem' } }, labelAttrs: { style: { marginLeft: '1rem', marginRight: '.25rem' } } });
+            }
+            else {
+                $('<div></div>').appendTo(line).valueSpinner({ canEdit: true, labelText: 'Cooldown Delay', binding: binding + 'cooldownDelay', min: 0, max: 10, step: 1, units: 'min', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { width: '7.5rem', marginLeft: '1rem', marginRight: '.25rem' } } });
+            }
         },
         dataBind: function (obj) {
             var self = this, o = self.options, el = self.element;
@@ -245,7 +255,7 @@
             //$('<div></div>').appendTo(line).valueSpinner({ labelText: 'Differential Temp', binding: binding + 'differentialTemp', min: 3, max: 9, step: 1, units: '&deg;' + o.tempUnits.name, inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft: '2rem', marginRight: '.25rem' } } });
             //line = $('<div></div>').appendTo(el);
             //$('<div></div>').appendTo(line).checkbox({ labelText: 'Nocturnal Cooling', binding: 'coolingEnabled' }).attr('title', 'Check this to enable cooling when the body is on/r/nand the solar temperature is less than the water temperature.');
-            $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Cooldown Delay', binding: binding + 'cooldownDelay', min: 1, max: 10, step: 1, units: 'min', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft: '1rem', marginRight: '.25rem' } } });
+            //$('<div></div>').appendTo(line).valueSpinner({ labelText: 'Cooldown Delay', binding: binding + 'cooldownDelay', min: 0, max: 10, step: 1, units: 'min', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft: '1rem', marginRight: '.25rem' } } });
         },
         dataBind: function (obj) {
             var self = this, o = self.options, el = self.element;
@@ -304,7 +314,7 @@
             });
             $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Differential Temp', binding: binding + 'differentialTemp', min: 3, max: 9, step: 1, units: '&deg;' + o.tempUnits.name, inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft:'2rem', marginRight: '.25rem' } } });
             line = $('<div></div>').appendTo(el);
-            $('<div></div>').appendTo(line).checkbox({ labelText: 'Nocturnal Cooling', binding: 'coolingEnabled' }).attr('title', 'Check this to enable cooling when the body is on/r/nand the solar temperature is less than the water temperature.');
+            $('<div></div>').appendTo(line).checkbox({ labelText: 'Cooling Enabled', binding: 'coolingEnabled' }).attr('title', 'Check this to enable cooling when the body is on/r/nand the solar temperature is less than the water temperature.');
         },
         dataBind: function (obj) {
             var self = this, o = self.options, el = self.element;
@@ -349,7 +359,8 @@
         _buildControls: function () {
             var self = this, o = self.options, el = self.element;
             el.empty();
-            el.addClass('pnl-mastertemp-heater');
+            el.addClass('pnl-hybrid-heater');
+            var pnlType = $('div.dashOuter').attr('data-controllertype').toLowerCase();
             var binding = '';
             var line = $('<div></div>').appendTo(el);
             $('<input type="hidden"></input>').appendTo(line).attr('data-bind', 'efficiencyMode').attr('data-datatype', 'int').val(3);
@@ -361,8 +372,12 @@
                 columns: [{ binding: 'val', hidden: true, text: 'Address' }, { binding: 'desc', text: 'Address' }],
                 items: addresses, inputAttrs: { style: { width: '3rem' } }, labelAttrs: { style: { width:'4rem' } }
             });
-            $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Boost Temp', binding: binding + 'boostTemp', min: 5, max: 10, step: 1, units: '&deg;' + o.tempUnits.name, inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft:'1rem', marginRight: '.25rem' } } });
-            $('<div></div>').appendTo(line).valueSpinner({ labelText: 'Economy Time', binding: binding + 'economyTime', min: 1, max: 6, step: 1, units: 'min', inputAttrs: { maxlength: 4 }, labelAttrs: { style: { marginLeft:'1rem', marginRight: '.25rem' } } });
+            $('<div></div>').appendTo(line).valueSpinner({ canEdit: true, labelText: 'Boost Temp', binding: binding + 'maxBoostTemp', min: 5, max: 10, step: 1, units: '&deg;' + o.tempUnits.name, inputAttrs: { style: { width: '2.5rem' } }, labelAttrs: { style: { marginLeft: '1rem', marginRight: '.25rem' } } });
+            $('<div></div>').appendTo(line).valueSpinner({ canEdit: true, labelText: 'Economy Time', binding: binding + 'economyTime', min: 1, max: 6, step: 1, units: 'hrs', inputAttrs: { style: { width: '2.5rem' } }, labelAttrs: { style: { marginLeft: '1rem', marginRight: '.25rem' } } });
+            if (!pnlType.endsWith('touch')) {
+                el.find('div[data-bind=maxBoostTemp]').each(function () { this.disabled(true); });
+                el.find('div[data-bind=economyTime]').each(function () { this.disabled(true); });
+            }
         },
         dataBind: function (obj) {
             var self = this, o = self.options, el = self.element;

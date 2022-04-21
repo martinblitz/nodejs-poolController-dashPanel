@@ -98,7 +98,10 @@
                     el.attr('data-active', true);
                     dataBinder.bind(el, data);
                     el.css({ display: '' });
-                    el.find('div.picIndicator').attr('data-status', data.command === 10 || data.relay > 0 ? 'on' : 'off');
+                    if (data.pumpOnDelay === true)
+                        el.find('div.picIndicator').attr('data-status', 'delay');
+                    else
+                        el.find('div.picIndicator').attr('data-status', data.command === 10 || data.relay > 0 ? 'on' : 'off');
                 }
                 el.attr('data-pumptype', data.type.val);
                 el.attr('data-id', data.id);
@@ -108,8 +111,10 @@
                         el.find('div.picFlow').hide();
                         el.find('div.picEnergy').hide();
                         el.find('div.picRelay').hide();
+                        el.find('div.picProgram').hide();
                         break;
                     case 'ds':
+                        el.find('div.picProgram').hide();
                         el.find('div.picSpeed').hide();
                         el.find('div.picFlow').hide();
                         el.find('div.picEnergy').hide();
@@ -122,23 +127,34 @@
                         else
                             el.find('div.picRelay').hide();
                         break;
+                    case 'hwvs':
                     case 'vs':
                     case 'vs+svrs':
+                        el.find('div.picProgram').hide();
                         el.find('div.picFlow').hide();
                         el.find('div.picSpeed').show();
                         el.find('div.picEnergy').show();
                         el.find('div.picRelay').hide();
                         break;
                     case 'vsf':
+                        el.find('div.picProgram').hide();
                         el.find('div.picFlow').show();
                         el.find('div.picSpeed').show();
                         el.find('div.picEnergy').show();
                         el.find('div.picRelay').hide();
                         break;
                     case 'vf':
+                        el.find('div.picProgram').hide();
                         el.find('div.picFlow').show();
                         el.find('div.picSpeed').hide();
                         el.find('div.picEnergy').show();
+                        el.find('div.picRelay').hide();
+                        break;
+                    case 'hwrly':
+                        el.find('div.picProgram').show();
+                        el.find('div.picFlow').hide();
+                        el.find('div.picSpeed').hide();
+                        el.find('div.picEnergy').hide();
                         el.find('div.picRelay').hide();
                         break;
                     case 'sf':
@@ -146,6 +162,7 @@
                         el.find('div.picFlow').hide();
                         el.find('div.picEnergy').hide();
                         el.find('div.picRelay').show();
+                        el.find('div.picProgram').hide();
                         if (typeof data.relay === 'undefined') data.relay = 0;
                         el.find('div.picRelay').html(self._createPrograms(data)[0].outerHTML);
 
@@ -156,7 +173,7 @@
                         break;
                 }
                 // Bind up any associated circuit speeds.
-                if (typeof (data.circuits) !== 'undefined') {
+                if (typeof data.circuits !== 'undefined') {
                     el.parent().find('div.picPopover.picPumpSettings[data-id=' + el.attr('data-id') + ']').each(function () {
                         let $this = $(this);
                         for (let i = 0; i < data.circuits.length; i++)
@@ -181,6 +198,8 @@
             $('<div class="picFlow picData"><span class="picGpm" data-bind="flow" data-fmttype="number" data-fmtmask="#,##0" data-fmtempty="---"></span><label class="picUnits">gpm</label></div>').appendTo(el);            
             $('<div class="picEnergy picData"><span class="picWatts" data-bind="watts" data-fmttype="number" data-fmtmask="#,##0" data-fmtempty="---"></span><label class="picUnits">watts</label></div>').appendTo(el);
             $('<div class="picRelay picData"><span class="picRelay" data-bind="relay" data-fmttype="number" data-fmtmask="#" data-fmtempty="---"></span></div>').appendTo(el);
+            $('<div class="picProgram"><span class=picCommand>Program #</span><span class="picCommand" data-bind="command" data-fmttype="number" data-fmtmask="#" data-fmtempty="---"></span></div>').appendTo(el);
+
             el.on('click', function (evt) {
                 let type = parseInt(el.attr('data-pumptype'), 10);
                 evt.stopImmediatePropagation();
@@ -195,7 +214,8 @@
                     divPopover.on('initPopover', function (evt) {
                         for (let i = 0; i < data.circuits.length; i++) {
                             let circuit = data.circuits[i];
-                            if (typeof circuit.circuit.type === 'undefined') continue;
+                            if (typeof circuit.circuit === 'undefined' || typeof circuit.circuit.type === 'undefined' || circuit.circuit.id <= 0) continue;
+                            
                             let div = $('<div class="picPumpCircuit"></div>');
                             div.attr('data-id', i + 1);
                             let btn = $('<div class="picCircuit" data-hidethemes="true"></div>');
@@ -204,7 +224,7 @@
                             spin.appendTo(div);
                             div.appendTo(evt.contents());
                             
-                            $('<input type="hidden" data-datatype="int" data-bind="units"></input>').appendTo(div).val(circuit.units.val);
+                            $('<input type="hidden" data-datatype="int" data-bind="units.val"></input>').appendTo(div).val(circuit.units.val);
                             if (circuit.circuit.equipmentType === 'feature') {
                                 div.attr('data-featureid', circuit.circuit.id);
                                 div.attr('data-eqid', circuit.circuit.id);
@@ -226,7 +246,7 @@
                             
                             spin.attr('data-units', circuit.units.val);
                             if (data.type.maxRelays > 0) {
-                                spin.valueSpinner({ val: circuit.relay, min: 1, max: data.type.maxRelays, step: 1, binding: 'relay' });
+                                spin.valueSpinner({ val: circuit.relay, min: 1, max: data.type.maxSpeeds || data.type.maxRelays, step: 1, binding: 'relay' });
                                 spin.find('div.picSpinner-value').css({ width: '3.5rem' });
                             }
                             else {

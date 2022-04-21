@@ -31,6 +31,8 @@
             else {
                 el.hide();
             }
+            var delays = $('<div></div>').appendTo(el).systemDelays();
+            if (typeof data !== 'undefined' && typeof data.delays !== 'undefined') delays[0].setEquipmentData(data.delays);
         },
         setTemps: function (data) {
             var self = this, o = self.options, el = self.element;
@@ -52,6 +54,58 @@
             else el.find('div.picSolarTempField').show();
         }
     });
+    $.widget('pic.bodyFilters', {
+        options: {},
+        _create: function () {
+            var self = this, o = self.options, el = self.element;
+            el[0].initFilters = function (data) { self._initFilters(data); };
+        },
+        _initFilters: function (data) {
+            var self = this, o = self.options, el = self.element;
+            el.empty();
+            let div = $('<div class="picCircuitTitle control-panel-title"></div>');
+            div.appendTo(el);
+            let span = $('<span class="picCircuitTitle"></span>');
+            span.appendTo(div);
+            span.text('Filters');
+            if (typeof data !== 'undefined' && data.filters.length > 0) {
+                el.show();
+                for (let i = 0; i < data.filters.length; i++) {
+                    $('<div></div>').appendTo(el).bodyFilter(data.filters[i]);
+                }
+            }
+            else el.hide();
+        }
+    });
+    $.widget('pic.bodyFilter', {
+        options: {},
+        _create: function () {
+            var self = this, o = self.options, el = self.element;
+            el[0].setEquipmentData = function (data) { self.setEquipmentData(data); };
+            self._initFilter();
+        },
+        _initFilter: function (data) {
+            var self = this, o = self.options, el = self.element;
+            el.addClass('picBodyFilter');
+            el.empty();
+            var div = $('<div class="picFilterState picIndicator"></div>').appendTo(el);
+            el.attr('data-id', o.id);
+            div.attr('data-ison', o.isOn);
+            div.attr('data-status', o.isOn ? 'on' : 'off');
+            $('<label class="picFilterName" data-bind="name"></label>').appendTo(el);
+            $('<span class="picFilterPressure picData"></label><span class="picPressureValue" data-bind="pressure" data-fmttype="number" data-fmtmask="#,##0.##" data-fmtempty="----"></span><label class="picUnits" data-bind="pressureUnits.name"></label></span>').appendTo(el);
+            $('<span class="picFilterPercentage picData"></label><span class="picPercentValue" data-bind="cleanPercentage" data-fmttype="number" data-fmtmask="#,##0.##" data-fmtempty="----"></span><label class="picUnits">%</label></span>').appendTo(el);
+            self.setEquipmentData(o);
+        },
+        setEquipmentData: function (data) {
+            var self = this, o = self.options, el = self.element;
+            if (typeof data.isOn !== 'undefined') {
+                el.find('div.picFilterState').attr('data-ison', makeBool(data.isOn));
+                el.find('div.picFilterState').attr('data-status', makeBool(data.isOn));
+            }
+            dataBinder.bind(el, data);
+        }
+    });
     $.widget('pic.body', {
         options: {},
         _create: function () {
@@ -65,6 +119,12 @@
             return $('<span class="fa-stack fa-2x picHeaterStatusIcon picSolarOn" style="vertical-align:middle;line-height:1em;font-size:inherit;">'
                 + '<i class="fas burst-animated fa-certificate fa-stack-1x fa-spin" style="color:goldenrod;vertical-align:middle;font-size:1.3em;"></i>'
                 + '<i class="fas fa-stack-2x fa-certificate fa-spin" style="color:orange;font-size:1em;vertical-align:middle;"></i>'
+                + '</span > ');
+        },
+        _createCooldownIcon: function () {
+            return $('<span class="fa-stack fa-2x picHeaterStatusIcon picCooldown" style="vertical-align:middle;line-height:1em;font-size:inherit;">'
+                + '<i class="fas fa-fan fa-stack-1x fa-spin" style="color:blue;vertical-align:middle;font-size:2em;animation-duration:.5s;"></i>'
+                + '<i class="fas fa-fan fa-stack-1x fa-spin" style="color:cornflowerblue;vertical-align:middle;font-size:1.5em;animation-duration:.5s;animation-direction:reverse;"></i>'
                 + '</span > ');
         },
         _createHeaterIcon: function () {
@@ -149,11 +209,27 @@
             self._createSolarIcon(1).appendTo(el);
             self._createHeaterIcon(1).appendTo(el);
             self._createCoolingIcon(1).appendTo(el);
+            self._createCooldownIcon(1).appendTo(el);
             el.on('click', 'div.picIndicator', function (evt) {
+                evt.preventDefault();
+                evt.stopImmediatePropagation();
+                if (el.hasClass('disabled')) return;
                 let ind = $(evt.target);
-                ind.attr('data-status', 'pending');
-                $.putApiService('state/circuit/setState', { id: parseInt(el.attr('data-circuitid'), 10), state: !makeBool(ind.attr('data-state')) }, function () { });
-                setTimeout(function () { ind.attr('data-status', makeBool(ind.attr('data-state')) ? 'on' : 'off'); }, 3000);
+                if (ind.attr('data-status') === 'delayon') {
+                    ind.attr('data-status', 'pending');
+                    //(url, data, message, successCallback, errorCallback, completeCallback)
+                    $.putApiService('state/circuit/setState', { id: parseInt(el.attr('data-circuitid'), 10), state: false }, function (circ, status, xhr) {
+                        self.setCircuitState(circ);
+                    }, function () { ind.attr('data-status', 'delayon'); });
+                }
+                else {
+                    ind.attr('data-status', 'pending');
+                    $.putApiService('state/circuit/setState', { id: parseInt(el.attr('data-circuitid'), 10), state: !makeBool(ind.attr('data-state')) }, function (circ, status, xhr) {
+                        self.setCircuitState(circ);
+                    }, function () {
+                        if (ind.attr('data-status') === 'pending') ind.attr('data-status', makeBool(ind.attr('data-state')) ? 'on' : 'off');
+                    });
+                }
             });
             el.on('click', 'div.picBodySetpoints', function (evt) {
                 var body = el;
@@ -165,7 +241,7 @@
                     hasCooling: makeBool(body.attr('data-hascooling'))
                 };
                 $.getApiService('/config/body/' + el.attr('data-id') + '/heatModes', null, function (data, status, xhr) {
-                    //console.log(data);
+                    console.log(data);
                     var units = el.parents('div.picBodies:first').attr('data-unitsname');
                     // https://github.com/tagyoureit/nodejs-poolController/issues/314
                     // setPoint was null; added error checking if this is not set; also added server side validation
@@ -178,7 +254,7 @@
                     divPopover.appendTo(el.parent());
                     divPopover.on('initPopover', function (evt) {
                         if (settings.hasCooling) {
-                            $('<div></div>').appendTo(evt.contents()).valueSpinner({ canEdit: true, labelText: 'Heat Point', val: settings.setPoint, min: units === "F" ? 65 : 5, max: units === "F" ? 104 : 41, step: 1, binding: 'heatSetpoint', units: '<span>&deg;</span><span class="picTempUnits">' + units + '</span>', labelAttrs: { style: { width: '5rem' } }, style: { display: 'block' } })
+                            $('<div></div>').appendTo(evt.contents()).valueSpinner({ canEdit: true, labelText: 'Heat Point', val: settings.setPoint, min: units === "F" ? 40 : 5, max: units === "F" ? 104 : 41, step: 1, binding: 'heatSetpoint', units: '<span>&deg;</span><span class="picTempUnits">' + units + '</span>', labelAttrs: { style: { width: '5rem' } }, style: { display: 'block' } })
                                 .on('change', function (e) {
                                     var coolSetpoint;
                                     divPopover.find('div[data-bind="coolSetpoint"]').each(function () { this.minVal(e.value + 1); coolSetpoint = this.val(); });
@@ -188,7 +264,7 @@
                                 .on('change', function (e) { self.putSetpoints(undefined, e.value); });
                         }
                         else
-                            $('<div></div>').appendTo(evt.contents()).valueSpinner({ canEdit: true, labelText: 'Set Point', val: settings.setPoint, min: units === "F" ? 65 : 5, max: units === "F" ? 104 : 41, step: 1, binding: 'heatSetpoint', units: '<span>&deg;</span><span class="picTempUnits">' + units + '</span>', labelAttrs: { style: { marginRight: '.25rem' } } })
+                            $('<div></div>').appendTo(evt.contents()).valueSpinner({ canEdit: true, labelText: 'Set Point', val: settings.setPoint, min: units === "F" ? 40 : 5, max: units === "F" ? 104 : 41, step: 1, binding: 'heatSetpoint', units: '<span>&deg;</span><span class="picTempUnits">' + units + '</span>', labelAttrs: { style: { marginRight: '.25rem' } } })
                                 .on('change', function (e) { self.putSetpoint(e.value); });
                         $('<div></div>').appendTo(evt.contents()).selector({ val: parseInt(body.attr('data-heatmode'), 10), test: 'text', opts: data, bind: 'heatMode' });
                         evt.contents().find('div.picSelector').on('selchange', function (e) {
@@ -207,10 +283,16 @@
             if (typeof data.heatMode === 'undefined') data.heatMode = { val: 0, name: 'off', desc: 'Unknown' };
             dataBinder.bind(el, data);
             try {
+                if (typeof data.isCovered !== 'undefined') el.attr('data-covered', data.isCovered);
                 if (typeof data.temp === 'undefined') el.find('span.picTempData').text('--');
+                if (typeof data.showInDashboard !== 'undefined') {
+                    if (makeBool(data.showInDashboard) === false) el.hide();
+                    else el.show();
+                }
                 el.find('div.picIndicator').attr('data-state', makeBool(data.isOn) ? 'on' : 'off');
-                el.find('div.picIndicator').attr('data-status', data.isOn ? 'on' : 'off');
+                el.find('div.picIndicator').attr('data-status', data.isOn ? data.stopDelay ? 'delayoff' : 'on' : data.startDelay ? 'delayon': 'off');
                 el.attr('data-ison', data.isOn);
+                self.disabled(data.stopDelay);
                 el.attr('data-setpoint', data.setPoint);
                 el.attr('data-coolsetpoint', data.coolSetpoint);
                 if (typeof data.heaterOptions === 'undefined' || data.heaterOptions.total < 1) {
@@ -244,30 +326,43 @@
                         el.find('span.picSolarOn').css('display', 'inline-block');
                         el.find('span.picCoolingOn').hide();
                         el.find('span.picHeaterOn').hide();
+                        el.find('span.picCooldown').hide();
                         break;
+                    case 'mtheat':
                     case 'hpheat':
                     case 'heater':
+                    case 'dual':
                         el.find('span.picSolarOn').hide();
                         el.find('span.picCoolingOn').hide();
                         el.find('span.picHeaterOn').css('display', 'inline-block');
+                        el.find('span.picCooldown').hide();
                         break;
                     case 'hpcool':
                     case 'cooling':
                         el.find('span.picSolarOn').hide();
                         el.find('span.picHeaterOn').hide();
                         el.find('span.picCoolingOn').css('display', 'inline-block');
+                        el.find('span.picCooldown').hide();
+                        break;
+                    case 'cooldown':
+                        el.find('span.picSolarOn').hide();
+                        el.find('span.picHeaterOn').hide();
+                        el.find('span.picCoolingOn').hide();
+                        el.find('span.picCooldown').css('display', 'inline-block');
                         break;
                     default:
                         el.find('span.picCoolingOn').hide();
                         el.find('span.picSolarOn').hide();
                         el.find('span.picHeaterOn').hide();
+                        el.find('span.picCooldown').hide();
                         break;
                 }
             } catch (err) { console.error({ msg: 'Error body data', err: err, body: data }); }
         },
         setCircuitState: function (data) {
             var self = this, o = self.options, el = self.element;
-            el.find('div.picBodyIcon div.picIndicator').attr('data-status', data.isOn ? 'on' : 'off');
+            el.find('div.picIndicator').attr('data-status', data.isOn ? data.stopDelay ? 'delayoff' : 'on' : data.startDelay ? 'delayon' : 'off');
+            self.disabled(data.stopDelay);
             el.find('div.picBodyIcon div.picIndicator').attr('data-state', data.isOn);
             el.find('label.picBodyText').text(data.name);
         },
@@ -287,9 +382,18 @@
         putSetpoints: function (heatSetpoint, coolSetpoint) {
             var self = this, o = self.options, el = self.element;
             $.putApiService('state/body/setPoint', { id: parseInt(el.attr('data-id'), 10), heatSetpoint: heatSetpoint, coolSetpoint: coolSetpoint }, function () { });
+        },
+        disabled: function (val) {
+            var self = this, o = self.options, el = self.element;
+            if (typeof val === 'undefined')
+                return el.hasClass('disabled');
+            else {
+                if (val) el.addClass('disabled');
+                else el.removeClass('disabled');
+            }
         }
-    });
 
+    });
     $.widget('pic.temps', {
         options: {},
         _create: function () {
@@ -307,7 +411,6 @@
             if (typeof o.showInFeatures !== 'undefined') el.attr('data-showinfeatures', o.showInFeatures);
         }
     });
-
     $.widget('pic.bodyHeatOptions', {
         options: {},
         _create: function() {
@@ -316,6 +419,38 @@
         },
         _buildControls: function() {
             var self = this, o = self.options, el = self.element;
+        }
+    });
+    $.widget('pic.systemDelays', {
+        options: {},
+        _create: function () {
+            var self = this, o = self.options, el = self.element;
+            self._buildControls();
+            el[0].setEquipmentData = function (data) { self.setEquipmentData(data); };
+        },
+        _buildControls: function () {
+            var self = this, o = self.options, el = self.element;
+            el.addClass('picSystemDelays').hide();
+            var btnPnl = $('<div class="picBtnPanel btn-panel"></div>').appendTo(el);
+            $('<div></div>').addClass('systemdelays-list').appendTo(btnPnl);
+            var btnCancel = $('<div id="btnCancelDelays"></div>').appendTo(btnPnl).actionButton({ text: 'Cancel Delays', icon: '<i class="fas fa-history"></i>' }).css({ verticalAlign:'top' })
+                .on('click', function (evt) {
+                    $.putApiService('state/cancelDelay', {}, 'Cancelling System Delays...', function (delays, status, xhr) {
+
+                    });
+                });
+        },
+        setEquipmentData: function (data) {
+            var self = this, o = self.options, el = self.element;
+            var list = el.find('div.systemdelays-list');
+            list.empty();
+            if (typeof data === 'undefined' || data.length === 0) el.hide();
+            else {
+                for (let i = 0; i < data.length; i++) {
+                    $('<div></div>').appendTo(list).text(data[i].message);
+                }
+                el.show();
+            }
         }
     });
 })(jQuery);

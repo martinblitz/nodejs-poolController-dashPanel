@@ -70,9 +70,15 @@ div.picPump,
 div.picChlorinator,
 div.chemControllerDiv,
 div.picPumpCircuit,
+div.picBodyFilter,
 div.picLightThemes {
   display: flex;
   flex-wrap: wrap; }
+
+div.picIBColorSelector > div.picToggleButton > div.picIndicator {
+  margin-left: .15em;
+  margin-right: -.19em;
+  margin-top: -.47em; }
 
 div.picSchedule > span, div.picSchedule > label, div.picChemistry label, div.picChemistry span {
   line-height: 2; }
@@ -86,6 +92,7 @@ div.picChemistry {
 div.picIBColorSelector {
   display: flex; }
 
+div.picBodyFilter:not(:last-child),
 div.picBody:not(:last-child),
 div.picChlorinator:not(:last-child),
 div.picSchedule:not(:last-child),
@@ -93,6 +100,11 @@ div.picPump:not(:last-child) {
   border-bottom: solid 1px rgba(0, 0, 0, 0.125);
   margin-bottom: 5px; }
 
+span.picFilterPercentage {
+  text-align: right; }
+
+span.picPressureValue,
+span.picFilterPercent,
 span.picCurrentOutput,
 div.picEnergy,
 div.picBodySetpoints,
@@ -101,6 +113,9 @@ table.picSchedDays,
 label.picPumpPrograms,
 table.picPumpPrograms,
 span.saturationIndex,
+div.picRelay,
+div.picProgram,
+span.picFilterPercentage,
 label.picIBThemeLabel {
   margin-right: auto; }
 
@@ -240,6 +255,7 @@ div.picVirtualCircuit {
   padding-left: .5em;
   display: flex; }
 
+div.picBodyFilter > label.picFilterName,
 div.picChlorinator > label.picChlorinatorName,
 div.picChemController label.picControllerName {
   overflow-y: hidden; }
@@ -259,6 +275,18 @@ span.picLightEndTime {
   margin-right: 5px;
   position: unset;
   right: unset; }
+
+div.picBody[data-covered=true]:before {
+  text-align: right;
+  display: block;
+  position: absolute;
+  left: -3.25em;
+  top: 2.5em; }
+
+span.picFilterPercentage,
+span.picFilterPressure {
+  width: 5rem;
+  text-align: right; }
 
 .test {
   color: white; }
@@ -473,10 +501,12 @@ table.optBody td,
 table.optHeader td {
   border-right: solid 1px gray; }
 
+table.crud-table > tbody > tr.selected > td:not(.btn-remove, .btn-edit),
 table.optBody > tbody > tr.selected {
   background: #2196F3 linear-gradient(180deg, #42a6f5, #2196F3);
   color: white; }
 
+table.crud-table > tbody > tr:hover > td:not(.btn-remove, .btn-edit),
 table.optBody > tbody > tr:hover {
   background: #88acda;
   color: white; }
@@ -527,6 +557,20 @@ div.picIndicator[data-status="true"] {
   background-color: #28a745;
   border-color: #28a745; }
 
+div.picIndicator[data-status=delayoff],
+div.picIndicator[data-status=delay] {
+  background-color: #28a745;
+  border-color: #28a745;
+  animation: blinker 1s linear infinite;
+  -webkit-animation: blinker 1s infinite linear; }
+
+div.picIndicator[data-status=delayon] {
+  color: white;
+  background-color: #007bff;
+  border-color: #007bff;
+  animation: blinker 1s linear infinite;
+  -webkit-animation: blinker 1s infinite linear; }
+
 div.picIndicator[data-status="selected"]::before {
   content: "✔";
   position: relative;
@@ -543,6 +587,24 @@ div.picIndicator[data-status="true"]::before {
 div.picIndicator[data-status="off"]::before,
 div.picIndicator[data-status="false"]::before {
   content: "Off";
+  position: relative;
+  top: calc(0.8rem - 5px);
+  left: calc(0.8rem - 5px); }
+
+div.picIndicator[data-status="delayoff"]::before {
+  content: "Del";
+  position: relative;
+  top: calc(0.8rem - 5px);
+  left: calc(0.8rem - 5px); }
+
+div.picIndicator[data-status="delayon"]::before {
+  content: "Del";
+  position: relative;
+  top: calc(0.8rem - 5px);
+  left: calc(0.8rem - 5px); }
+
+div.picIndicator[data-status="delay"]::before {
+  content: "Del";
   position: relative;
   top: calc(0.8rem - 5px);
   left: calc(0.8rem - 5px); }
@@ -597,5 +659,6 @@ div.picModules {
   margin-bottom: 5px; }
 
 div.picCircuit.btn, div.picFeature.btn, div.picCircuitGroup.btn,
+div.picFilters > *,
 div.picPumps > *, div.picVirtualCircuit.btn {
   align-items: center; }

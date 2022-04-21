@@ -6,6 +6,7 @@
     --picPumps-order: 5;
     --picChemistry-order: 10;
     --picSchedules-order: 15;
+    --picFilters-order: 17;
     --picBodies-display: block;
     --picCircuits-display: block;
     --picLights-display: block;
@@ -13,11 +14,17 @@
     --picPumps-display: block;
     --picChemistry-display: block;
     --picSchedules-display: block;
+    --picFilters-display: block;
     --number-of-columns: 2;
     --dashContainer2-display: block;
     --dashContainer3-display: block;
     --show-time-remaining: inline-block;
 }
+div.picPickList > div.picPickList-value:empty:before {
+    content:attr(data-placeholder);
+    color:gray;
+}
+
 
 div.container1, div.container2, div.container3 {
     display: flex;
@@ -48,7 +55,7 @@ div.picFeatures div.picFeatureGrid > div.picCircuitGroup[data-showinfeatures=fal
 select, input[type=text], fieldset {
     font-size:1rem;
 }
-div.picLights > div.picCircuit[data-showinfeatures=true] {
+div.picLights > div.picFeatureGrid > div.picCircuit[data-showinfeatures=true] {
     display: none;
 }
 div.picOptionButton > i {
@@ -163,6 +170,11 @@ div.picController > div.picControllerLine label {
     -webkit-animation: burst 1s infinite linear;
     animation: burst 1s infinite linear
 }
+@keyframes blinker {
+    50% {
+        opacity: 0;
+    }
+}
 @keyframes flicker {
     0% {
         transform: rotate(-4deg);
@@ -240,6 +252,10 @@ div.picCircuits{
 div.picVirtualCircuits{
     order :var(--picVirtualCircuits-order);
     display: var(--picVirtualCircuits-display) !important;
+}
+div.picFilters {
+    order: var(--picFilters-order);
+    display: var(--picFilters-display) !important;
 }
 div.picLights{
     order :var(--picLights-order);
@@ -449,10 +465,15 @@ label.picUnits, span.picUnits {
     padding-right:.1em;
     font-size:.8em;
 }
-div.picPump, div.picChlorinator, div.picSchedule, div.picChemController {
+div.picPump, div.picChlorinator, div.picSchedule, div.picChemController, div.picBodyFilter {
     font-size:.9rem;
     cursor:pointer;
 }
+    div.picBodyFilter > span.picFilterPercentage {
+        display: inline-block;
+        float: right;
+    }
+    div.picBodyFilter > label.picFilterName,
     div.picChlorinator > label.picChlorinatorName,
     div.picChemController label.picControllerName {
         display: inline-block;
@@ -513,6 +534,9 @@ div.picValueSpinner > input.picSpinner-value {
 }
 div.picSpinner-value {
     font-size: 1.1rem;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
 }
 span.picSpinner-units {
     display:inline-block;
@@ -1042,6 +1066,8 @@ div.chem-balance-value {
     font-size:32pt;
     font-weight:bold;
     text-align:center;
+    margin-left:-12px;
+    margin-right:-12px;
 }
 div.picChemLevel {
     margin-top:1.77rem;
@@ -1147,9 +1173,11 @@ div.warning-message {
     margin: 0 5px 5px 5px;
     padding: 5px;
     font-size: 1.2em;
-    width: 120px;
+    width: 130px;
   }
-
+  .btn.disabled {
+      opacity: .5;
+  }
   @media screen and (max-width: 744px) {
     #appearance-order-col-1, #appearance-order-col-2, #appearance-order-col-3, #appearance-order-col-hidden {
     margin-right: 50%}
@@ -1166,9 +1194,12 @@ div.warning-message {
       border: 1px dashed #eee;
       color: gray;
   }
-  .ui-state-highlight{
-      min-height: 35px;
-  }
+.ui-sort-placeholder {
+    min-height: 35px;
+    border: 1px solid #dad55e;
+    background: #fffa90;
+    color: #777620;
+}
 .slist-list[data-cancreate="false"] .btn-add,
 .crud-list[data-cancreate="false"] .btn-add {
     display: none;
@@ -1282,4 +1313,36 @@ span.header-icon-btn {
 }
 .slist-body {
     width:inherit;
+}
+table.crud-table {
+    cursor:pointer;
+}
+div.pnl-restorebackup-fileattrs {
+    font-size:.77rem;
+}
+div.pnl-restorebackup-fileattrs label {
+    display: inline-block;
+    width: 3rem;
+    font-weight:bold;
+}
+div.picBody {
+    position:relative;
+}
+div.picBody[data-covered=true]:before {
+    content: "Covered";
+    color: orangered;
+    font-weight:bold;
+    font-size:1em;
+    width:100%;
+    left:0;
+    top:0;
+    vertical-align:middle;
+    display:block;
+    line-height:1;
+    margin-bottom:-1em;
+}
+div.systemdelays-list {
+    display:inline-block;
+    float:left;
+    font-size:.7rem;
 }

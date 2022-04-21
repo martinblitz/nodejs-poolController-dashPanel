@@ -446,7 +446,7 @@ mhelper.init();
 (function ($) {
     $.widget("pic.messageList", {
         options: {
-            receivingMessages: false, pinScrolling: false, changesOnly: false, messageKeys: {}, contexts: {}, messages: {}
+            receivingMessages: false, pinScrolling: false, changesOnly: false, messageKeys: {}, contexts: {}, messages: {}, filters: [], rowIds:[]
         },
         _create: function () {
             var self = this, o = self.options, el = self.element;
@@ -456,7 +456,7 @@ mhelper.init();
             el[0].addBulkApiCall = function (call) { self.addBulkApiCall(call); };
             el[0].commitBulkMessages = function () { self.commitBulkMessages(); };
             el[0].receivingMessages = function (val) { return self.receivingMessages(val); };
-            el[0].cancelBulkMessages = function () {};
+            el[0].cancelBulkMessages = function () { };
             el[0].clear = function () { self.clear(); };
             el[0].clearOutbound = function () { self.clearOutbound(); };
             el[0].pinSelection = function (val) {
@@ -493,6 +493,13 @@ mhelper.init();
             //console.log({ docHeight: docHeight, rect: rect, pos: el.offset() });
             el.css({ height: height + 'px' });
         },
+        _calcMessageFilter: function (obj) {
+            var self = this, o = self.options, el = self.element;
+            if (o.changesOnly && obj.hasChanged === false) return true;
+            let msg = o.messages[`m${obj.rowId}`];
+            if (o.filters.includes(msg.messageKey)) return true;
+            return false;
+        },
         _initList: function () {
             var self = this, o = self.options, el = self.element;
             el.empty();
@@ -506,6 +513,7 @@ mhelper.init();
             $('<div class="picScrolling mmgrButton picIconRight" title="Pin Selection"><i class="fas fa-thumbtack"></i></div>').appendTo(div);
             $('<div class="picChangesOnly mmgrButton picIconRight" title="Show only changes"><i class="fas fa-not-equal"></i></div>').appendTo(div);
             $('<div class="picClearMessages mmgrButton picIconRight" title="Clear Messages"><i class="fas fa-broom"></i></div>').appendTo(div);
+            $('<div class="picFilter mmgrButton picIconRight" title="Filter Display"><i class="fas fa-filter"></i></div>').appendTo(div);
             $('<div class="picUploadLog mmgrButton picIconRight" title="Upload a Log File"><i class="fas fa-upload"></i></div>').appendTo(div);
 
 
@@ -533,7 +541,7 @@ mhelper.init();
                 var msgKey = evt.newRow.attr('data-msgkey');
                 var docKey = evt.newRow.attr('data-dockey');
                 var prev;
-
+                var forMsg;
                 for (var i = ndx - 1; i >= 0; i--) {
                     var p = $(evt.allRows[i].row);
                     if (p.attr('data-msgkey') === msgKey) {
@@ -542,7 +550,15 @@ mhelper.init();
                         break;
                     }
                 }
-                pnlDetail[0].bindMessage(msg, prev, o.contexts[docKey]);
+                if (typeof msg.responseFor !== 'undefined' && msg.responseFor.length > 0) {
+                    let id = msg.responseFor[0];
+                    let rid = o.rowIds.find(elem => elem.msgId === id);
+                    if(typeof rid !== 'undefined')
+                        forMsg = o.messages['m' + rid.rowId];
+                    console.log({ rid: rid, forMsg: forMsg });
+                }
+                //console.log(docKey);
+                pnlDetail[0].bindMessage(msg, prev, forMsg, o.contexts[docKey]);
             });
             el.on('click', 'div.picStartLogs', function (evt) {
                 var mm = $('div.picMessageManager')[0];
@@ -550,25 +566,78 @@ mhelper.init();
             });
             el.on('click', 'div.picScrolling', function (evt) {
                 o.pinScrolling = !o.pinScrolling;
-                console.log(evt);
+                //console.log(evt);
                 if (!o.pinScrolling) $(evt.currentTarget).removeClass('selected');
                 else $(evt.currentTarget).addClass('selected');
             });
             el.on('click', 'div.picChangesOnly', function (evt) {
                 o.changesOnly = !o.changesOnly;
                 if (o.changesOnly) {
-                    $(evt.currentTarget).addClass('selected');
                     el.addClass('changesOnly');
-                    vlist[0].applyFilter(function (obj) {
-                        obj.hidden = !obj.hasChanged;
-                    });
+                    $(evt.currentTarget).addClass('selected');
                 }
                 else {
                     $(evt.currentTarget).removeClass('selected');
                     el.removeClass('changesOnly');
-                    vlist[0].clearFilter();
                 }
+                self._filterMessages();
             });
+            el.on('click', 'div.picFilter', function (evt) {
+                let filt = { protocols: [] };
+                console.log(o.contexts);
+                for (var s in o.contexts) {
+                    let c = o.contexts[s];
+                    let p = filt.protocols.find(elem => elem.name === c.protocol.name);
+                    if (typeof p === 'undefined') {
+                        p = { name: c.protocol.name, desc: c.protocol.desc, actions: [] };
+                        filt.protocols.push(p);
+                    }
+
+                    if (typeof c.actionByte !== 'undefined') {
+                        let act = p.actions.find(elem => elem.val === c.actionByte);
+                        if (typeof act === 'undefined') {
+                            act = { val: c.actionByte, name: c.actionName, filters: [], sources: [], dests: [] };
+                            p.actions.push(act);
+                        }
+                        // Check to see if we have a filter defined.
+                        if (typeof act.filters.find(elem => elem.key === c.messageKey) === 'undefined') {
+                            act.filters.push({
+                                key: c.messageKey,
+                                filtered: o.filters.includes(c.messageKey),
+                                actionExt: c.actionExt,
+                                payloadKey: c.payloadKey,
+                                category: c.category,
+                                context: c,
+                                source: { val: c.sourceAddr.val, name: c.sourceAddr.name },
+                                dest: { val: c.destAddr.val, name: c.destAddr.name }
+                            });
+                        }
+                    }
+                    else if (typeof c.requestor !== 'undefined') {
+                        let act = p.actions.find(elem => elem.endpoint === o.endpoint);
+                        if (typeof act === 'undefined') {
+                            act = { val: 1, name: c.endpoint, filters: [], sources: [], dests: [] };
+                            p.actions.push(act);
+                        }
+                        if (typeof act.filters.find(elem => elem.key === s) === 'undefined') {
+                            act.filters.push({
+                                key: s,
+                                filtered: o.filters.includes(s),
+                                category: 'API Call',
+                                actionExt: '',
+                                context: c,
+                                source: { val: null, name: c.requestor }
+                            });
+                        }
+
+                    }
+                }
+                // We should have a complete list of what is contained in this so lets show a filter dialog.
+                // Protocol --> Action --> Source / Dest
+                //console.log(filt);
+                self._createFilterDialog(filt);
+            });
+
             el.on('click', 'div.picClearMessages', function (evt) { self.clear(); });
             el.on('click', 'i.fa-clipboard', function (evt) {
                 var row = $(evt.currentTarget).parents('tr.msgRow:first');
@@ -596,10 +665,149 @@ mhelper.init();
                 self._resetHeight();
             });
         },
+        _filterMessages: function () {
+            var self = this, o = self.options, el = self.element;
+            let vlist = el.find('div.picVirtualList:first');
+            //console.log(o.filters);
+            vlist[0].applyFilter(function (obj) {
+                obj.hidden = self._calcMessageFilter(obj);
+                //if (obj.isApiCall === true) obj.hidden = false;
+                //else obj.hidden = self._calcMessageFilter(obj);
+            });
+        },
+        _createFilterDialog: function (filt) {
+            var self = this, o = self.options, el = self.element;
+            var dlg = $.pic.modalDialog.createDialog('dlgFilterMessages', {
+                message: 'Filter Messages',
+                width: '400px',
+                height: 'auto',
+                title: 'Filter Messages',
+                buttons: [
+                    {
+                        text: 'Clear', icon: '<i class="fas fa-broom"></i>',
+                        click: function () {
+                            dlg.find('div.picCheckbox').each(function () { this.val(false); });
+                        }
+                    },
+                    {
+                        text: 'Apply', icon: '<i class="fas fa-save"></i>',
+                        click: function () {
+                            let keys = [];
+                            dlg.find('div.picCheckbox').each(function () {
+                                if (this.val()) keys.push($(this).attr('data-messageKey'));
+                            });
+                            //console.log(keys);
+                            o.filters = keys;
+                            self._filterMessages();
+                        }
+                    },
+                    {
+                        text: 'Cancel', icon: '<i class="far fa-window-close"></i>',
+                        click: function () { $.pic.modalDialog.closeDialog(this); }
+                    }
+                ]
+            });
+            var outer = $('<div></div>').appendTo(dlg).addClass('pnl-protofilter').css({
+                maxHeight: `calc(100vh - 177px)`, overflowY: 'auto'
+            });
+            let fnCalcChecks = (div) => {
+                return {
+                    checked: div.find('div.picCheckbox.cb-filter > input[type=checkbox]:checked'),
+                    unchecked: div.find('div.picCheckbox.cb-filter > input[type=checkbox]:not(:checked)')
+                };
+            };
+            for (var i = 0; i < filt.protocols.length; i++) {
+                let f = filt.protocols[i];
+                let divP = $('<div></div>').appendTo(outer).addClass('pnl-protocol');
+                $('<div></div>').appendTo(divP).css({ fontWeight: 'bold' });
+                $('<div></div>').appendTo(divP).checkbox({ labelHtml: `<span>${f.desc}</span>` }).addClass('cb-protocol').css({ fontWeight: 'bold' });
+                for (let a = 0; a < f.actions.length; a++) {
+                    let act = f.actions[a];
+                    let divA = $('<div></div>').appendTo(divP).addClass('pnl-action');
+                    $('<div></div>').appendTo(divA).checkbox({ labelHtml: `<span>[<span class="msg-detail-byte">${act.val}</span>]<span> ${act.name}</span>` })
+                        .css({ marginLeft: '1rem', fontWeight: 'bold' }).addClass('cb-action');
+                    for (let j = 0; j < act.filters.length; j++) {
+                        let filter = act.filters[j];
+                        let divFilter = $('<div></div>').css({ marginLeft: '2rem', fontSize: '.8rem' }).appendTo(divA);
+                        if (typeof filter.dest !== 'undefined') {
+                            $('<div></div>').checkbox({
+                                labelHtml: `<span>[<span class="msg-detail-byte">${filter.source.val}</span>] ${filter.source.name} <i class="fas fa-arrow-right msg-detail-fromto"></i> [<span class="msg-detail-byte">${filter.dest.val}</span>] ${filter.dest.name} <span class="msg-detail-byte" title="${filter.category}:${filter.payloadKey}">${filter.actionExt}</span></span>`,
+                                value: filter.filtered
+                            }).appendTo(divFilter).attr('data-messageKey', filter.key).addClass('cb-filter');
+                        }
+                        else if (typeof filter.source !== 'undefined') {
+                            $('<div></div>').checkbox({
+                                labelHtml: `<span><span class="msg-detail-byte">${filter.source.name}</span></span></span>`,
+                                value: filter.filtered
+                            }).appendTo(divFilter).attr('data-messageKey', filter.key).addClass('cb-filter');
+
+                        }
+                    }
+                    let achecks = fnCalcChecks(divA);
+                    if (achecks.checked.length === 0) divA.find('div.picCheckbox.cb-action').each(function () { this.indeterminate(false); this.val(false); });
+                    else if (achecks.checked.length > 0 && achecks.unchecked.length === 0) divA.find('div.picCheckbox.cb-action').each(function () { this.indeterminate(false); this.val(true); });
+                    else divA.find('div.picCheckbox.cb-action').each(function () { this.indeterminate(true); });
+                }
+                let pchecks = fnCalcChecks(divP);
+                if (pchecks.checked.length === 0) divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(false); this.val(false); });
+                else if (pchecks.checked.length > 0 && pchecks.unchecked.length === 0) divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(false); this.val(true); });
+                else divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(true); });
+            }
+            outer.on('changed', 'div.picCheckbox.cb-protocol', function (evt) {
+                let div = $(evt.currentTarget).parents('div.pnl-protocol:first');
+                try {
+                    dlg.attr('data-processing', true);
+                    div.find('div.picCheckbox.cb-action').each(function () {
+                        if (this.val() !== evt.newVal) {
+                            this.val(evt.newVal);
+                        }
+                        this.indeterminate(false);
+                    });
+                } catch (err) { console.log(err); }
+            });
+            outer.on('changed', 'div.picCheckbox.cb-action', function (evt) {
+                let div = $(evt.currentTarget).parents('div.pnl-action:first');
+                try {
+                    div.find('div.picCheckbox.cb-filter').each(function () { if (this.val() !== evt.newVal) this.val(evt.newVal); });
+                    let divP = div.parents('div.pnl-protocol:first');
+                    let checks = fnCalcChecks(divP);
+                    if (checks.checked.length === 0) divP.find('div.picCheckbox.cb-protocol').each(function () {
+                        if (this.val() !== false) this.val(false);
+                        this.indeterminate(false);
+                    });
+                    else if (checks.checked.length > 0 && checks.unchecked.length === 0) divP.find('div.picCheckbox.cb-protocol').each(function () {
+                        if (this.val() !== true) this.val(true);
+                        this.indeterminate(false);
+                    });
+                    else divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(true); });
+
+                } catch (err) { console.log(err); }
+            });
+            outer.on('changed', 'div.picCheckbox.cb-filter', function (evt) {
+                if (dlg.attr('data-processing') === true) return;
+                let divA = $(evt.currentTarget).parents('div.pnl-action:first');
+                let divP = divA.parents('div.pnl-protocol:first');
+                let checks = fnCalcChecks(divA);
+                if (checks.checked.length === 0) divA.find('div.picCheckbox.cb-action').each(function () { this.indeterminate(false); this.val(false); });
+                else if (checks.checked.length > 0 && checks.unchecked.length === 0) divA.find('div.picCheckbox.cb-action').each(function () { this.indeterminate(false); this.val(true); });
+                else divA.find('div.picCheckbox.cb-action').each(function () { this.indeterminate(true); });
+
+                checks = fnCalcChecks(divP);
+                if (checks.checked.length === 0) divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(false); this.val(false); });
+                else if (checks.checked.length > 0 && checks.unchecked.length === 0) divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(false); this.val(true); });
+                else divP.find('div.picCheckbox.cb-protocol').each(function () { this.indeterminate(true); });
+            });
+            
+            dlg.parent().position({ my: 'center', at: 'center', of: window });
+
+        },
         clear: function () {
             var self = this, o = self.options, el = self.element;
             el.find('div.picVirtualList')[0].clear();
+            o.messages = {};
+            o.contexts = {};
             o.messageKeys = {};
+            o.rowIds = [];
         },
         clearOutbound: function () {
             var self = this, o = self.options, el = self.element;
@@ -645,7 +853,7 @@ mhelper.init();
             row.attr('data-msgdir', msg.direction);
             row.addClass('msgRow');
             var ctx = msgManager.getListContext(msg);
-            o.contexts[ctx.docKey] = ctx;
+            o.contexts[ctx.messageKey] = ctx;
             if ((typeof msg.isValid !== 'undefined' && !msg.isValid) || (typeof msg.valid !== 'undefined' && !msg.valid)) row.addClass('invalid');
 
             $('<span></span>').text(msg._id).appendTo(r.cells[1]);
@@ -658,7 +866,8 @@ mhelper.init();
             $('<span></span>').text(ctx.destAddr.name).appendTo(r.cells[6]);
             $('<span></span>').text(ctx.actionByte).appendTo(r.cells[7]);
             $(r.cells[7]).attr('title', ctx.actionName).addClass('msg-action');
-            $('<span></span>').text(msg.payload.join(',')).appendTo(r.cells[8]);
+            if (typeof msg.payload !== 'undefined' && typeof msg.payload.join === 'function') $('<span></span>').text(msg.payload.join(',')).appendTo(r.cells[8]);
+            else console.log(msg);
             var prev = o.messageKeys[ctx.messageKey];
             var hasChanged = false;
             if (typeof prev === 'undefined')
@@ -672,16 +881,19 @@ mhelper.init();
             }
             else
                 row.addClass('nochange');
-            if (o.changesOnly && !hasChanged) obj.hidden = true;
+            //if (o.changesOnly && !hasChanged) obj.hidden = true;
 
             o.messageKeys[ctx.messageKey] = msg;
             msg.rowId = obj.rowId;
+            msg.messageKey = ctx.messageKey;
             //row.data('message', msg); Can't store jquery data. Create our own message cache.
             o.messages['m' + obj.rowId] = msg;
+            o.rowIds.push({ rowId: obj.rowId, msgId: msg._id });
             row.attr('data-msgkey', ctx.messageKey);
             row.attr('data-dockey', ctx.docKey);
             row.attr('data-msgid', msg._id);
             obj.hasChanged = hasChanged;
+            obj.hidden = self._calcMessageFilter(obj);
             if (typeof prev !== 'undefined') obj.prevId = prev.rowId;
             if (!o.pinScrolling) {
                 if (!o.changesOnly || (o.changesOnly && hasChanged)) {
@@ -693,13 +905,20 @@ mhelper.init();
             var self = this, o = self.options, el = self.element;
             var row = obj.row;
             var r = row[0];
+            msg.messageKey = `${msg.requestor}${msg.path}`;
+            o.contexts[msg.messageKey] = {
+                protocol: { name: 'api', desc: 'API Call' }, requestor: msg.requestor, endpoint: msg.path };
+            //keyFormat: key, protocol: proto, sourceByte: source, destByte: dest, controllerByte: controller,
+            //    actionByte: action, sourceAddr: addrSource, destAddr: addrDest, payloadLength: length
             row.attr('data-msgdir', msg.direction);
             row.addClass('msgApiRow');
+            row.attr('data-msgkey', `${msg.requestor}${msg.path}`);
             $('<span></span>').text('').appendTo(r.cells[1]);
             var dir = $('<i></i>').addClass('fas').addClass(msg.direction === 'out' ? 'fa-arrow-circle-left' : 'fa-arrow-circle-right');
             $('<span></span>').append(dir).appendTo(r.cells[2]);
             var spChg = $('<span class="changed"></span>').append('<i class="fas fa-poo"></i>').appendTo(r.cells[3]).css({ color: 'brown' });
-            $(r.cells[4]).attr('colspan', 4).text(`${msg.requestor}${msg.path}`);
+            $(r.cells[4]).attr('colspan', 4).css({ width: '218px' });//.text(`${msg.requestor}${msg.path}`);
+            $('<span></span>').text(`${msg.requestor}${msg.path}`).appendTo($(r.cells[4])).css({ width: '214px', textOverlow: 'ellipsis', whiteSpace: 'nowrap' });
             $(r.cells[7]).remove();
             $(r.cells[6]).remove();
             $(r.cells[5]).remove();
@@ -709,8 +928,11 @@ mhelper.init();
                     self.selectRowByIndex(obj.rowId, true);
                 }
             }
+            obj.hasChanged = true;
+            obj.isApiCall = true;
             row.attr('data-msgid', msg._id);
             o.messages['m' + obj.rowId] = msg;
+            obj.hidden = self._calcMessageFilter(obj);
 
         },
         _bindVListRow(obj, msg, autoSelect) {
@@ -793,7 +1015,7 @@ mhelper.init();
         options: { message: null },
         _create: function () {
             var self = this, o = self.options, el = self.element;
-            el[0].bindMessage = function (msg, prev, ctx) { self.bindMessage(msg, prev, ctx); };
+            el[0].bindMessage = function (msg, prev, msgFor, ctx) { self.bindMessage(msg, prev, msgFor, ctx); };
             self._initHeader();
             self._initMessageDetails();
             self._initApiCallDetails();
@@ -812,6 +1034,9 @@ mhelper.init();
             var divOuter = $('<div class="api-detail-info" style="display:none;"></div>').appendTo(el);
             div = $('<div></div>').appendTo(divOuter).addClass('msg-detail-section').addClass('apiDetails');
             var line = $('<div class="dataline"><div>').appendTo(div);
+            $('<label>Timestamp:</label>').appendTo(line);
+            $('<span></span>').appendTo(line).attr('data-bind', 'timestamp');
+            line = $('<div class="dataline"><div>').appendTo(div);
             $('<label>Requestor:</label>').appendTo(line);
             $('<span></span>').appendTo(line).attr('data-bind', 'requestor');
             line = $('<div class="dataline"></div>').appendTo(div);
@@ -874,9 +1099,11 @@ mhelper.init();
             $('<label>Term:</label>').appendTo(line);
             $('<span></span>').appendTo(line).addClass('msg-detail-bytearray').attr('data-bind', 'term');
 
-            line = $('<div class="dataline msg-detail-response"></div>').appendTo(div);
+            line = $('<div class="dataline msg-detail-response"></div>').appendTo(div).hide();
             $('<label title="Response For">Resp For:</label>').appendTo(line);
             $('<span></span>').appendTo(line).addClass('msg-detail-bytearray').attr('data-bind', 'responseFor');
+            $('<span></span>').appendTo(line).attr('data-bind', 'responseTime').attr('data-fmttype', 'number').attr('data-fmtmask', '#,###').css({ marginLeft: '7px', verticalAlign:'top', display:'inline-block' });
+            $('<span></span>').appendTo(line).text('ms').css({ verticalAlign: 'top', display: 'inline-block' });
             $('<div class="payloadBytes"></div>').appendTo(div);
             $('<div class="msg-payload"></div>').appendTo(msgDiv);
             div = $('<div></div>').appendTo(divOuter).addClass('msg-detail-section');
@@ -950,7 +1177,7 @@ mhelper.init();
                }
             }
         },
-        _bindMessage: function (msg, prev, ctx) {
+        _bindMessage: function (msg, prev, msgFor, ctx) {
             var self = this, o = self.options, el = self.element;
             el.find('div.msg-detail-info').show();
             el.find('div.api-detail-info').hide();
@@ -969,6 +1196,8 @@ mhelper.init();
             else {
                 el.find('div.msg-detail-panel').show();
                 if (typeof ctx === 'undefined') ctx = msgManager.getListContext(msg);
+                //ctx = msgManager.getListContext(msg);
+                //console.log({ ctx: ctx, msg: msg });
                 o.context = ctx;
                 obj = {
                     isValid: msg.valid || msg.isValid,
@@ -987,17 +1216,26 @@ mhelper.init();
                     term: msg.term.join(','),
                     responseFor: ''
                 };
+                if (typeof msg.responseFor !== 'undefined' && msg.responseFor.length > 0 && typeof msgFor !== 'undefined') {
+                    // Find the first message in the list.
+                    obj.responseTime = Date.parse(msg.timestamp.trim()) - Date.parse(msgFor.timestamp.trim());
+                }
                 obj.responseFor = typeof msg.responseFor !== 'undefined' && msg.responseFor.length ? msg.responseFor.join(',') : '';
                 // Delete all the dynamic styles for selection.
                 var styleResp = $('#responseStyles');
                 var sheet = styleResp[0].sheet;
                 for (var rule = sheet.cssRules.length - 1; rule >= 0; rule--) sheet.deleteRule(rule);
                 if (typeof msg.responseFor !== 'undefined') {
+                    el.find('div.msg-detail-response').show();
+
                     // Add in all the rules where the reference is valid.
                     for (var n = 0; n < msg.responseFor.length; n++) {
                         sheet.addRule('tr.msgRow[data-msgid="' + (msg.responseFor[n]) + '"] > td.msg-action', 'background-color:yellow;font-weight:bold;');
                     }
                 }
+                else
+                    el.find('div.msg-detail-response').hide();
+
                 //console.log(sheet);
             }
             if (msg.isValid === false) {
@@ -1009,7 +1247,6 @@ mhelper.init();
                 el.removeClass('invalid');
             }
             el.find('div.picAddToQueue').show();
-
             o.message = msg;
 
             dataBinder.bind(el, obj);
@@ -1203,6 +1440,9 @@ mhelper.init();
             $('<div></div>').attr('id', 'btnSendQueue').appendTo(btnPnl).actionButton({ text: 'Send Queue', icon: '<i class="far fa-paper-plane"></i>' }).on('click', function (e) {
                 self.sendQueue();
             });
+            $('<div></div>').attr('id', 'btnReplayQueue').appendTo(btnPnl).actionButton({ text: 'Replay (to app)', icon: '<i class="far fa-paper-plane"></i>' }).on('click', function (e) {
+                self.replayQueue();
+            });
             $('<div></div>').attr('id', 'btnRunTests').appendTo(btnPnl).actionButton({ text: 'Run Script', icon: '<i class="far fa-paper-plane"></i>' }).on('click', function (e) {
                 el.addClass('processing');
                 outModule.begin();
@@ -1296,6 +1536,7 @@ mhelper.init();
                 el.find('#btnRunTests').hide();
                 el.find('#btnAddMessage').hide();
                 el.find('#btnSendQueue').hide();
+                el.find('#btnReplayQueue').hide();
                 el.find('div.picEditQueue').hide();
                 el.find('div.picSaveQueue').hide();
                 //$('script#scriptTestModule').remove();
@@ -1323,6 +1564,7 @@ mhelper.init();
                 el.find('#btnRunTests').hide();
                 el.find('#btnAddMessage').show();
                 el.find('#btnSendQueue').show();
+                el.find('#btnReplayQueue').show();
                 el.find('div.picEditQueue').show();
                 el.find('div.picSaveQueue').show();
             }
@@ -1382,7 +1624,20 @@ mhelper.init();
 
             self.processNextMessage();
         },
-        processNextMessage: function () {
+        replayQueue: function () {
+            var self = this, o = self.options, el = self.element;
+            el.addClass('processing');
+            // Send out the messages on the interval.
+            el.find('div.queued-message').each(function () {
+                self.msgQueue.push(this);
+            });
+            o.messagesToSend = self.msgQueue.length;
+            o.messagesSent = 0;
+            el.find('div.picMessageListTitle:first > span').text('Sending Messages...');
+
+            self.processNextMessage(true);
+        },
+        processNextMessage: function (toApp) {
             var self = this, o = self.options, el = self.element;
             var mm = $('div.picMessageManager')[0];
             if (self.msgQueue.length > 0) {
@@ -1395,8 +1650,14 @@ mhelper.init();
                         setTimeout(function () {
                             o.messagesSent++;
                             elMsg.addClass('sent');
-                            mm.sendOutboundMessage(msg);
-                            self.processNextMessage();
+                            if (toApp){
+                                mm.sendInboundMessage(msg);
+                                self.processNextMessage(true);
+                            }
+                            else {
+                                mm.sendOutboundMessage(msg);
+                                self.processNextMessage();
+                            }
                         }, (msg.delay || 0));
                     }
                 }

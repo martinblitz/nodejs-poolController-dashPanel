@@ -59,10 +59,16 @@ div.picChlorinator,
 // div.picChemistry,
 div.chemControllerDiv,
 div.picPumpCircuit,
+div.picBodyFilter,
 div.picLightThemes {
     // padding-bottom:.4rem;
     display: flex;
     flex-wrap: wrap;
+}
+div.picIBColorSelector > div.picToggleButton > div.picIndicator {
+    margin-left:.15em;
+    margin-right:-.19em;
+    margin-top: -.47em;
 }
 div.picSchedule > span, div.picSchedule > label, div.picChemistry label, div.picChemistry span {
     line-height: 2;
@@ -76,6 +82,7 @@ div.picChemistry {
 div.picIBColorSelector{
     display: flex;
 }
+div.picBodyFilter:not(:last-child),
 div.picBody:not(:last-child),
 div.picChlorinator:not(:last-child),
 div.picSchedule:not(:last-child),
@@ -83,6 +90,11 @@ div.picPump:not(:last-child) {
     border-bottom: solid 1px rgba(0, 0, 0, 0.125);
     margin-bottom: 5px;
 }
+span.picFilterPercentage {
+    text-align:right;
+}
+span.picPressureValue,
+span.picFilterPercent,
 span.picCurrentOutput, 
 div.picEnergy, 
 div.picBodySetpoints,
@@ -91,6 +103,9 @@ table.picSchedDays,
 label.picPumpPrograms,
 table.picPumpPrograms,
 span.saturationIndex,
+div.picRelay,
+div.picProgram,
+span.picFilterPercentage,
 label.picIBThemeLabel {
     margin-right: auto;
 }
@@ -232,6 +247,8 @@ div.picVirtualCircuit {
     padding-left: .5em;
     display: flex;
 }
+
+div.picBodyFilter > label.picFilterName,
 div.picChlorinator > label.picChlorinatorName,
 div.picChemController label.picControllerName {
     overflow-y: hidden;
@@ -251,4 +268,16 @@ span.picLightEndTime {
     margin-right: 5px;
     position: unset;
     right: unset;
+}
+div.picBody[data-covered=true]:before {
+    text-align:right;
+    display:block;
+    position:absolute;
+    left:-3.25em;
+    top:2.5em;
+}
+span.picFilterPercentage,
+span.picFilterPressure {
+    width:5rem;
+    text-align:right;
 }

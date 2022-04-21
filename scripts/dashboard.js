@@ -14,9 +14,11 @@
             el.find('div.picController').each(function () { this.initController(); });
             el.find('div.picBodies').each(function () { this.initBodies(); });
             el.find('div.picCircuits').each(function () { this.initCircuits(); });
+            el.find('div.picLights').each(function () { this.initLights(); });
             el.find('div.picPumps').each(function () { this.initPumps(); });
             el.find('div.picChemistry').each(function () { this.initChemistry(); });
             el.find('div.picSchedules').each(function () { this.initSchedules(); });
+            el.find('div.picFilters').each(function () { this.initFilters(); });
         },
         _createControllerPanel: function (data) {
             var self = this, o = self.options, el = self.element;
@@ -29,11 +31,17 @@
         _createCircuitsPanel: function (data) {
             var self = this, o = self.options, el = self.element;
             el.find('div.picCircuits').each(function () { this.initCircuits(data); });
+            el.find('div.picLights').each(function () { this.initLights(data); });
         },
         _createPumpsPanel: function (data) {
             var self = this, o = self.options, el = self.element;
             el.find('div.picPumps').each(function () { this.initPumps(data); });
         },
+        _createFiltersPanel: function (data) {
+            var self = this, o = self.options, el = self.element;
+            el.find('div.picFilters').each(function () { this.initFilters(data); });
+        },
+
         _reset: function () {
             var self = this, o = self.options, el = self.element;
             if (o.socket && typeof o.socket !== 'undefined' && o.socket.connected) {
@@ -53,7 +61,7 @@
         _setControllerType: function (type) {
             var self = this, o = self.options, el = self.element;
             $('body').attr('data-controllertype', type);
-            switch (type.toLowerCase()) {
+            switch ((type || '').toLowerCase()) {
                 case 'intellicenter':
                     $('div.picDashboard').attr('data-controllertype', 'IntelliCenter');
                     $('div.picDashboard').attr('data-hidethemes', 'false');
@@ -126,6 +134,7 @@
                     self._createPumpsPanel(data);
                     self._createChemistryPanel(data);
                     self._createSchedulesPanel(data);
+                    self._createFiltersPanel(data);
                     console.log(data);
                     self.receivePortStats(o.sendPortStatus);
                 })
@@ -165,6 +174,7 @@
                     self._createPumpsPanel(data);
                     self._createChemistryPanel(data);
                     self._createSchedulesPanel(data);
+                    self._createFiltersPanel(data);
                     self._initSockets();
                     console.log(data);
                     console.log('initializing element order');
@@ -201,12 +211,19 @@
                     $(':root').css('--picChemistry-order', getStorage('--picChemistry-order'));
                     if (typeof getStorage('--picChemistry-display') === 'undefined') setStorage('--picChemistry-display', $(':root').css('--picChemistry-display'));
                     $(':root').css('--picChemistry-display', getStorage('--picChemistry-display'));
+
+                    if (typeof getStorage('--picFilters-order') === 'undefined') setStorage('--picFilters-order', $(':root').css('--picFilters-order'));
+                    $(':root').css('--picFilters-order', getStorage('--picFilters-order'));
+                    if (typeof getStorage('--picFilters-display') === 'undefined') setStorage('--picFilters-display', $(':root').css('--picFilters-display'));
+                    $(':root').css('--picFilters-display', getStorage('--picFilters-display'));
+
                     if (typeof getStorage('--show-time-remaining') === 'undefined') setStorage('--show-time-remaining', $(':root').css('--show-time-remaining'));
                     $(':root').css('--show-time-remaining', getStorage('--show-time-remaining'));
 
                     // put elements in correct container div
-                    let arr = ['picBodies', 'picCircuits', 'picLights', 'picSchedules', 'picChemistry', 'picPumps', 'picVirtualCircuits']
+                    let arr = ['picBodies', 'picCircuits', 'picLights', 'picSchedules', 'picChemistry', 'picPumps', 'picVirtualCircuits', 'picFilters'];
                     arr.forEach(id => {
+                        console.log(id);
                         let el = $(`.${id}`);
                         let elVarName = `--${id}-order`;
                         if (getStorage(elVarName) >= 200) {
@@ -234,8 +251,9 @@
                 o.socket = io(o.apiServiceUrl, { reconnectionDelay: 2000, reconnection: true, reconnectionDelayMax: 20000, upgrade: true });
             }
             else {
-                console.log({ msg: 'Connecting socket through proxy', url: window.location.origin.toString() });
-                o.socket = io(window.location.origin.toString(), { reconnectionDelay: 2000, reconnection: true, reconnectionDelayMax: 20000, upgrade: true });
+                let path = window.location.pathname.replace(/[^/]*$/, '') + 'socket.io';
+                console.log({ msg: 'Connecting socket through proxy', url: window.location.origin.toString(), path: path });
+                o.socket = io(window.location.origin.toString(), { path: path, reconnectionDelay: 2000, reconnection: true, reconnectionDelayMax: 20000, upgrade: true });
             }
             o.socket.on('circuit', function (data) {
                 console.log({ evt: 'circuit', data: data });
@@ -311,6 +329,12 @@
                 });
                 console.log({ evt: 'body', data: data });
             });
+            o.socket.on('filter', function (data) {
+                console.log({ evt: 'filter', data: data });
+                $('div.picBodyFilter[data-id=' + data.id + ']').each(function () {
+                    this.setEquipmentData(data);
+                });
+            });
             o.socket.on('config', function (data) {
                 console.log({ evt: 'config', data: data });
             });
@@ -321,9 +345,13 @@
                 });
 
             });
-            o.socket.on('delay', function (data) {
-                console.log({ evt: 'delay', data: data });
+            o.socket.on('delays', function (data) {
+                console.log({ evt: 'delays', data: data });
+                $('div.picSystemDelays').each(function () {
+                    this.setEquipmentData(data);
+                });
             });
+
             o.socket.on('equipment', function (data) {
                 console.log({ evt: 'equipment', data: data });
                 $('body').attr('data-controllertype', data.controllerType);
@@ -361,9 +389,9 @@
             });
             o.socket.on('rs485Stats', function (data) {
                 console.log({ evt: 'rs485Stats', data: data });
-                var rs485Displays = el.find('div.rs485Stats');
+                var rs485Displays = el.find(`div.pnl-rs485Stats`);
                 rs485Displays.each(function () {
-                    this.setRS485Stats(data);
+                    if($(this).attr('data-portid') === data.portId.toString()) this.dataBind(data);
                 });
                 // Turn it off if there are no displays out there.
                 if (rs485Displays.length === 0) self.receivePortStats(false);
