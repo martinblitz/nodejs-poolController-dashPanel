@@ -20,7 +20,6 @@ if (!Date.parseISO) {
         return new Date(s[0], s[1] - 1, s[2], s[3], s[4], s[5]);
     };
 }
-
 if (!String.prototype.padStart) {
     String.prototype.padStart = function padStart(targetLength, padString) {
         targetLength = targetLength >> 0; //truncate if number, or convert non-number to 0;
@@ -318,25 +317,13 @@ jQuery.each(['get', 'put', 'delete', 'post'], function (i, method) {
         if (typeof message !== 'undefined') {
             console.log('Showing message: ' + message);
             // We are displaying a message while the service is underway.
-            msg = $('<div style="visibility:hidden;"></div>').addClass('picServiceStatusMsg').appendTo(document.body);
-            overlay = $('<div style="background-color:lavender;opacity:.15"></div>').addClass('ui-widget-overlay').addClass('ui-front').appendTo(document.body);
-            if (message instanceof jQuery) message.appendTo(msg);
-            else
-                $('<div></div>').html(message).appendTo(msg);
-            msg.css({
-                visibility: '',
-                left: ($(document).width() - msg.width()) / 2,
-                top: ($(document).height() - msg.height()) / 2
-            });
-            overlay.css({ zIndex: _screenLayer + 1 });
-            msg.css({ zIndex: _screenLayer + 2 });
+            msg = $.pic.waitMessage.showWaitMessage(message, {});
         }
         // Set up the callbacks.
         var cbComplete = function (jqXHR, status) {
             if (typeof msg !== 'undefined') {
                 msg.fadeOut(300, function () {
                     msg.remove();
-                    if (typeof overlay !== 'undefined') overlay.remove();
                 });
             }
         };
@@ -401,31 +388,16 @@ jQuery.each(['get', 'put', 'delete', 'post'], function (i, method) {
             message = undefined;
         }
         var msg;
-        var overlay;
         if (typeof message !== 'undefined') {
             console.log('Showing message: ' + message);
             // We are displaying a message while the service is underway.
-            msg = $('<div style="visibility:hidden;"></div>').addClass('picServiceStatusMsg').appendTo(document.body);
-            overlay = $('<div style="background-color:lavender;opacity:.15"></div>').addClass('ui-widget-overlay').addClass('ui-front').appendTo(document.body);
-            overlay.css({ zIndex: _screenLayer + 1 });
-            msg.css({ zIndex: _screenLayer + 2 });
-            if (message instanceof jQuery) message.appendTo(msg);
-            else
-                $('<div></div>').html(message).appendTo(msg);
-            msg.css({
-                visibility: '',
-                left: ($(document).width() - msg.width()) / 2,
-                top: ($(document).height() - msg.height()) / 2
-            });
-            overlay.css({ zIndex: _screenLayer + 1 });
-            msg.css({ zIndex: _screenLayer + 2 });
+            msg = $.pic.waitMessage.showWaitMessage(message, {});
         }
         // Set up the callbacks.
         var cbComplete = function (jqXHR, status) {
             if (typeof msg !== 'undefined') {
                 msg.fadeOut(300, function () {
                     msg.remove();
-                    if (typeof overlay !== 'undefined') overlay.remove();
                 });
             }
         };
@@ -483,24 +455,13 @@ jQuery.each(['get', 'put', 'delete', 'post'], function (i, method) {
         if (typeof message !== 'undefined') {
             console.log('Showing message: ' + message);
             // We are displaying a message while the service is underway.
-            msg = $('<div style="visibility:hidden;"></div>').addClass('picServiceStatusMsg').appendTo(document.body);
-            overlay = $('<div style="background-color:lavender;opacity:.15"></div>').addClass('ui-widget-overlay').addClass('ui-front').appendTo(document.body);
-            if (message instanceof jQuery) message.appendTo(msg);
-            else
-                $('<div></div>').html(message).appendTo(msg);
-            msg.css({
-                visibility: '',
-                left: ($(document).width() - msg.width()) / 2,
-                top: ($(document).height() - msg.height()) / 2
-            });
-
+            msg = $.pic.waitMessage.showWaitMessage(message, {});
         }
         // Set up the callbacks.
         var cbComplete = function (jqXHR, status) {
             if (typeof msg !== 'undefined') {
                 msg.fadeOut(300, function () {
                     msg.remove();
-                    if (typeof overlay !== 'undefined') overlay.remove();
                 });
             }
         };
@@ -571,8 +532,6 @@ function setCookie(name, value, days) {
     else if (typeof days === 'undefined')
     document.cookie = name + '=' + value + ';expires=' + expires + '; path=/';
 }
-
-
 var dataBinder = {
     checkRequired: function (el, show) {
         var isValid = true;
@@ -582,9 +541,9 @@ var dataBinder = {
                 if (this.isEmpty()) {
                     isValid = false;
                     if (typeof this.label === 'function')
-                        $('<div></div>').appendTo($(this)).fieldTip({ message: this.label().text() + ' is Required' });
+                        $('<div></div>').appendTo($(this)).fieldTip({ message: this.label().text() + ' is Required' }).css({ whiteSpace: 'nowrap' });
                     else 
-                        $('<div></div>').appendTo($(this)).fieldTip({ message: 'Value is Required' });
+                        $('<div></div>').appendTo($(this)).fieldTip({ message: 'Value is Required' }).css({ whiteSpace: 'nowrap' });
                 }
             }
             else if (typeof this.val === 'function') {
@@ -592,9 +551,9 @@ var dataBinder = {
                 if (typeof val === 'undefined') {
                     isValid = false;
                     if (typeof this.label === 'function')
-                        $('<div></div>').appendTo($(this)).fieldTip({ message: this.label().text() + ' is Required' });
+                        $('<div></div>').appendTo($(this)).fieldTip({ message: this.label().text() + ' is Required' }).css({ whiteSpace: 'nowrap' });
                     else
-                        $('<div></div>').appendTo($(this)).fieldTip({ message: 'Value is Required' });
+                        $('<div></div>').appendTo($(this)).fieldTip({ message: 'Value is Required' }).css({ whiteSpace: 'nowrap' });
                 }
             }
         });
@@ -2961,12 +2920,14 @@ $.ui.position.fieldTip = {
             el[0].addRow = function (data) { return self.addRow(data); };
             el[0].select = function (row) { return self.selectRow(row); };
             el[0].selectedIndex = function (ndx, scrollTo) { return typeof ndx === 'undefined' ? o.selectedIndex : self.selectRow($(o.rows[ndx].row), scrollTo); };
+            el[0].objByIndex = function (ndx) { return ndx >= 0 && ndx < o.rows.length ? o.rows[ndx] : undefined; };
+            el[0].rowByIndex = function (ndx) { return ndx >= 0 && ndx < o.rows.length ? $(o.rows[ndx].row) : undefined; };
             el[0].clear = function (fn) { self.clear(fn); };
             el[0].render = function (recalc) { if (recalc) self._calculateBlocks(); self.render(); };
             el[0].applyFilter = function (cb) { self.applyFilter(cb); self._calculateBlocks(); self.render(); };
             el[0].clearFilter = function () { o.hiddenRows = 0; self._calculateBlocks(true); self.render(); };
             el[0].scrollTo = function (ndx) { self.scrollTo(ndx); };
-
+            el[0].totalRows = function () { return o.rows.length; };
         },
         _buildControls: function () {
             var self = this, o = self.options, el = self.element;
@@ -3052,7 +3013,6 @@ $.ui.position.fieldTip = {
             var offBottom = ((o.rows.length - o.hiddenRows) * o.rowHeight) - offTop - (rows.length * o.rowHeight);
             return { offset: { top: offTop, bottom: offBottom }, rows: rows };
         },
-
         render(startBlock) { // This is the same as the insertToDom method
             var self = this, o = self.options, el = self.element;
             var body = el.find('div.vlist-body');
@@ -3090,7 +3050,6 @@ $.ui.position.fieldTip = {
             //console.log({ cyCluster: o.clusterHeight, cyBlock: o.blockHeight, top: o.scrollTop });
             return Math.floor(o.scrollTop / o.blockHeight) || 0;
         },
-
         _getRowsHeight: function () {
             var self = this, o = self.options, el = self.element;
             o.blockHeight = o.rowHeight * o.rowsPerBlock;
@@ -3215,7 +3174,6 @@ $.ui.position.fieldTip = {
             o.selectedIndex = -1;
             self.render();
         },
-        
         scrollTo: function (ndx) {
             var self = this, o = self.options, el = self.element;
             if (ndx < o.rows.length) {
@@ -4148,7 +4106,59 @@ $.ui.position.fieldTip = {
             }
         }
     });
+    $.widget("pic.waitIcon", {
+        options: {},
+        _create: function () {
+            let self = this, o = self.options, el = self.element;
+            el.addClass('pic-waiticon');
+            el[0].innerHTML = '<div class="wait-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>';
+            //let div = $('<div></div>').addClass('wait-roller');
+            //for (let i = 0; i < 8; i++) $('<div></div>').appendTo(div);
+            //div.appendTo(el);
+        }
+
+    });
+    $.widget("pic.waitMessage", {
+        options: {},
+        _create: function () {
+            let self = this, o = self.options, el = self.element;
+            console.log('In waitMessage._create()');
+            o.layer = _screenLayer + 2;
+            el.css({ zIndex: o.layer, visibility: 'hidden' });
+            el.addClass('overlay-message');
+            let div = $('<div></div>').appendTo(el);//.addClass('picServiceStatusMessage');
+            $('<div></div>').appendTo(div).waitIcon();
+            $('<span></span>').appendTo(div).html(o.message);
+            el[0].show = function () { self.show(); };
+            el[0].close = function () {
+                el.css({ visibility: 'hidden' });
+                o.overlay.remove();
+            };
+            console.log(o);
+        },
+        show: function () {
+            var self = this, o = self.options, el = self.element;
+            el.css({
+                visibility: '',
+                left: (el.parent().width() - el.width()) / 2,
+                top: (el.parent().height() - el.height()) / 2
+            });
+            o.overlay = $('<div style="background-color:lavender;opacity:.15"></div>').addClass('ui-widget-overlay').addClass('ui-front').css({ zIndex: o.layer - 1 }).appendTo(el.parent());
+        },
+        _destroy: function () {
+            var self = this, o = self.options, el = self.element;
+            console.log('In Destroy');
+            console.log(o.overlay);
+            if(typeof o.overlay !== 'undefined') o.overlay.remove();
+        }
+    });
 })(jQuery);
+$.pic.waitMessage.showWaitMessage = function (message, opts) {
+    msg = $('<div style="visibility:hidden;"></div>').appendTo(document.body).waitMessage($.extend(true, {}, { message: message }, opts));
+    msg[0].show();
+    return msg;
+};
+
 $.pic.fieldTip.showTip = function (el, opts) {
     $('<div></div>').appendTo(el).fieldTip(opts);
 };

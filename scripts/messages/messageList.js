@@ -446,7 +446,7 @@ mhelper.init();
 (function ($) {
     $.widget("pic.messageList", {
         options: {
-            receivingMessages: false, pinScrolling: false, changesOnly: false, messageKeys: {}, contexts: {}, messages: {}, filters: [], rowIds:[]
+            receivingMessages: false, pinScrolling: false, changesOnly: false, messageKeys: {}, contexts: {}, messages: {}, portFilters: [], filters: [], rowIds: [], ports: []
         },
         _create: function () {
             var self = this, o = self.options, el = self.element;
@@ -497,13 +497,13 @@ mhelper.init();
             var self = this, o = self.options, el = self.element;
             if (o.changesOnly && obj.hasChanged === false) return true;
             let msg = o.messages[`m${obj.rowId}`];
+            if (o.portFilters.includes(msg.port)) return true;
             if (o.filters.includes(msg.messageKey)) return true;
             return false;
         },
         _initList: function () {
             var self = this, o = self.options, el = self.element;
             el.empty();
-
             var tblOuter = $('<table class="msgList-container"></table>').appendTo(el);
             var tbody = $('<tbody></tbody>').appendTo(tblOuter);
             var row = $('<tr></tr>').appendTo(tbody);
@@ -515,6 +515,8 @@ mhelper.init();
             $('<div class="picClearMessages mmgrButton picIconRight" title="Clear Messages"><i class="fas fa-broom"></i></div>').appendTo(div);
             $('<div class="picFilter mmgrButton picIconRight" title="Filter Display"><i class="fas fa-filter"></i></div>').appendTo(div);
             $('<div class="picUploadLog mmgrButton picIconRight" title="Upload a Log File"><i class="fas fa-upload"></i></div>').appendTo(div);
+            $('<div class="picReplayLog mmgrButton picIconRight" title="Replay List To njsPC"><i class="fas fa-paper-plane"></i></div>').appendTo(div)
+                .on('click', (evt) => { self._promptReplayList(); });
 
 
             row = $('<tr></tr>').addClass('msgList-body').appendTo(tbody);
@@ -553,9 +555,8 @@ mhelper.init();
                 if (typeof msg.responseFor !== 'undefined' && msg.responseFor.length > 0) {
                     let id = msg.responseFor[0];
                     let rid = o.rowIds.find(elem => elem.msgId === id);
-                    if(typeof rid !== 'undefined')
+                    if (typeof rid !== 'undefined')
                         forMsg = o.messages['m' + rid.rowId];
-                    console.log({ rid: rid, forMsg: forMsg });
                 }
                 //console.log(docKey);
                 pnlDetail[0].bindMessage(msg, prev, forMsg, o.contexts[docKey]);
@@ -583,8 +584,13 @@ mhelper.init();
                 self._filterMessages();
             });
             el.on('click', 'div.picFilter', function (evt) {
-                let filt = { protocols: [] };
-                console.log(o.contexts);
+                let filt = { ports: [], protocols: [] };
+                //console.log(o.contexts);
+                console.log(o.portFilters);
+                console.log(o.ports);
+                for (let i = 0; i < o.ports.length; i++) {
+                    filt.ports.push({ port: o.ports[i], filtered: o.portFilters.includes(o.ports[i]) });
+                }
                 for (var s in o.contexts) {
                     let c = o.contexts[s];
                     let p = filt.protocols.find(elem => elem.name === c.protocol.name);
@@ -592,7 +598,6 @@ mhelper.init();
                         p = { name: c.protocol.name, desc: c.protocol.desc, actions: [] };
                         filt.protocols.push(p);
                     }
-
                     if (typeof c.actionByte !== 'undefined') {
                         let act = p.actions.find(elem => elem.val === c.actionByte);
                         if (typeof act === 'undefined') {
@@ -614,7 +619,7 @@ mhelper.init();
                         }
                     }
                     else if (typeof c.requestor !== 'undefined') {
-                        let act = p.actions.find(elem => elem.endpoint === o.endpoint);
+                        let act = p.actions.find(elem => elem.name === o.endpoint);
                         if (typeof act === 'undefined') {
                             act = { val: 1, name: c.endpoint, filters: [], sources: [], dests: [] };
                             p.actions.push(act);
@@ -665,6 +670,205 @@ mhelper.init();
                 self._resetHeight();
             });
         },
+        _promptReplayList: function () {
+            let self = this, o = self.options, el = self.element;
+            let dlg = $.pic.modalDialog.createDialog('dlgReplayList', {
+                width: '357px',
+                height: 'auto',
+                title: `Replay Messages to njsPC`,
+                position: { my: "center top", at: "center top", of: el },
+                buttons: [
+                    {
+                        text: 'Cancel', icon: '<i class="far fa-window-close"></i>',
+                        click: function () {
+                            divControls.attr('data-mode', 'stop');
+                            $.pic.modalDialog.closeDialog(this);
+                        }
+                    }
+                ]
+            });
+            let mm = $('.picMessageManager:first')[0];
+            let div = $('<div></div>').appendTo(dlg);
+            let divMessage = $('<div></div>').appendTo(div).css({ textAlign: 'center' }).text('Stopped');
+            $('<hr></hr>').appendTo(div).css({ margin: '2px' });
+            let divControls = $('<div></div>').attr('data-mode', 'stopped').appendTo(div).css({ textAlign: 'center' });
+            let divSlider = $('<div></div>').appendTo(div).css({ paddingLeft: '27px', paddingRight: '27px', paddingTop:'7px' });
+            let slider = $('<input></input>').attr('type', 'range').attr('min', -100).attr('max', 100).attr('value', 0).appendTo(divSlider).css({ width: '100%' });
+            let divSLabel = $('<div></div>').appendTo(divSlider).css({ fontSize: '.7rem', width: 'calc(100% + 14px)', height: '17px', marginLeft:'-7px' });
+            $('<span></span>').text('Faster').appendTo(divSLabel).css({ float: 'left'});
+            $('<span></span>').text('Slower').appendTo(divSLabel).css({ float: 'right' });
+            
+            el[0].pinSelection(true);
+            el[0].logMessages(false);
+
+            let fnCreateButton = (title, icon) => {
+                let btn = $('<span></span>').attr('title', title).addClass('btn').appendTo(divControls).css({ display: 'inline-block', width: '3rem', textAlign: 'center' });
+                $('<i></i>').appendTo(btn).addClass(icon);
+                return btn;
+            };
+            let fnGetNextMessage = () => {
+                if (currIndex >= vlist[0].totalRows()) return;
+                let obj = vlist[0].objByIndex(currIndex);
+                let msg = o.messages['m' + obj.rowId];
+                if (!obj.hidden && msg.isValid && msg.direction === 'in') {
+                    return msg;
+                }
+                if (currIndex + 1 >= vlist[0].totalRows()) return;
+                return fnGetNextMessage(++currIndex);
+            };
+            let fnGetPrevMessage = () => {
+                if (currIndex < 0) return;
+                let obj = vlist[0].objByIndex(currIndex);
+                let msg = o.messages['m' + obj.rowId];
+                if (!obj.hidden && msg.isValid && msg.direction === 'in') {
+                    return msg;
+                }
+                if (currIndex - 1 < 0) return;
+                return fnGetPrevMessage(--currIndex);
+            };
+
+            let playTimer = null;
+            let fnProcessMessage = async (msg) => {
+                if (typeof msg === 'undefined') return;
+                if (playTimer) {
+                    clearTimeout(playTimer);
+                    playTimer = null;
+                }
+                try {
+                    divMessage.text(`Processing Message ${msg._id || currIndex}`);
+                    let m = $.extend(true, {}, msg);
+                    m.direction = 'out';
+                    delete m.isValid;
+                    delete m.packetCount;
+                    delete m.complete;
+                    delete m.timestamp;
+                    delete m._complete;
+                    delete m.messageKey;
+                    delete m.rowId;
+                    vlist[0].selectedIndex(currIndex, true);
+                    mm.sendInboundMessage(m);
+                } catch (err) { console.log(`Error processing message ${err}`); }
+                finally {
+                    switch (divControls.attr('data-mode')) {
+                        case 'play':
+                            currIndex++;
+                            let next = fnGetNextMessage();
+                            if (typeof next !== 'undefined') {
+                                let tspan = (new Date(next.timestamp) - new Date(msg.timestamp).getTime());
+                                let t = tspan + (tspan * (slider.val() / 100));
+                                console.log({ text: 'Next', timeout: t, next: next, tspan: tspan });
+                                playTimer = setTimeout(async () => { await fnProcessMessage(next); }, t);
+                            }
+                            else {
+                                divControls.attr('data-mode', 'stopped');
+                                btnPrev.removeClass('disabled');
+                                btnNext.removeClass('disabled');
+                                btnPlay.removeClass('disabled');
+                                btnPause.removeClass('flicker-animated');
+                                if (!btnPause.hasClass('disabled')) btnPause.addClass('disabled');
+                                if (!btnStop.hasClass('disabled')) btnStop.addClass('disabled');
+                            }
+                            break;
+                    }
+                }
+            };
+            let vlist = el.find('div.picVirtualList:first');
+            let currIndex = vlist[0].selectedIndex();
+            let btnPrev = fnCreateButton('Previous Message', 'fas fa-backward-step').on('click', (evt) => {
+                if ($(evt.target).hasClass('disabled')) return;
+                if (playTimer) {
+                    clearTimeout(playTimer);
+                    playTimer = null;
+                }
+                if (currIndex > 0) {
+                    currIndex--;
+                    divControls.attr('data-mode', 'prev');
+                    let msg = fnGetPrevMessage();
+                    if (typeof msg !== 'undefined') playTimer = setTimeout(async () => { await fnProcessMessage(msg); }, 100);
+                }
+            });
+            let btnPlay = fnCreateButton('Play from Selected', 'fas fa-play').on('click', (evt) => {
+                if ($(evt.target).hasClass('disabled')) return;
+                if (!btnPrev.hasClass('disabled')) btnPrev.addClass('disabled');
+                if (!btnNext.hasClass('disabled')) btnNext.addClass('disabled');
+                let msg = fnGetNextMessage();
+                if (playTimer) {
+                    clearTimeout(playTimer);
+                    playTimer = null;
+                }
+                if (typeof msg !== 'undefined') {
+                    btnPause.removeClass('flicker-animated');
+                    btnPause.removeClass('disabled');
+                    btnStop.removeClass('disabled');
+                    btnPlay.addClass('disabled');
+                    divControls.attr('data-mode', 'play');
+                    playTimer = setTimeout(async () => { await fnProcessMessage(msg); }, 100);
+                }
+
+            });
+            let btnNext = fnCreateButton('Next Message', 'fas fa-forward-step').on('click', (evt) => {
+                if ($(evt.target).hasClass('disabled')) return;
+                if (playTimer) {
+                    clearTimeout(playTimer);
+                    playTimer = null;
+                }
+                if (currIndex < vlist[0].totalRows()) {
+                    currIndex++;
+                    divControls.attr('data-mode', 'next');
+                    let msg = fnGetNextMessage();
+                    if (typeof msg !== 'undefined') playTimer = setTimeout(async () => { await fnProcessMessage(msg); }, 100);
+                }
+            });
+            let btnPause = fnCreateButton('Pause Replay', 'fas fa-pause').addClass('disabled').on('click', (evt) => {
+                if ($(evt.target).hasClass('disabled')) return;
+                if (playTimer) {
+                    clearTimeout(playTimer);
+                    playTimer = null;
+                }
+                let mode = divControls.attr('data-mode');
+                if (mode === 'paused' || mode === 'next' || mode === 'prev') {
+                    // Start playing again.
+                    btnPause.removeClass('flicker-animated');
+                    if (!btnPrev.hasClass('disabled')) btnPrev.addClass('disabled');
+                    if (!btnNext.hasClass('disabled')) btnNext.addClass('disabled');
+                    btnPlay.addClass('disabled');
+                    btnPause.removeClass('disabled');
+                    btnStop.removeClass('disabled');
+                    divControls.attr('data-mode', 'play');
+                    let msg = fnGetNextMessage();
+                    if (typeof msg !== 'undefined') playTimer = setTimeout(async () => { await fnProcessMessage(msg); }, 100);
+                }
+                else {
+                    if (!btnPause.hasClass('flicker-animated')) btnPause.addClass('flicker-animated');
+                    divMessage.text('Paused');
+                    divControls.attr('data-mode', 'paused');
+                    btnStop.removeClass('disabled');
+                    btnPrev.removeClass('disabled');
+                    btnNext.removeClass('disabled');
+                    btnPlay.removeClass('disabled');
+                }
+            });
+            let btnStop = fnCreateButton('Stop Replay', 'fas fa-stop').addClass('disabled').on('click', (evt) => {
+                if ($(evt.target).hasClass('disabled')) return;
+                divControls.attr('data-mode', 'stopped');
+                divMessage.text('Stopped');
+                if (playTimer) {
+                    clearTimeout(playTimer);
+                    playTimer = null;
+                }
+                btnPrev.removeClass('disabled');
+                btnNext.removeClass('disabled');
+                btnPlay.removeClass('disabled');
+                btnPause.removeClass('flicker-animated');
+                if(!btnPause.hasClass('disabled')) btnPause.addClass('disabled');
+                if(!btnStop.hasClass('disabled')) btnStop.addClass('disabled');
+            });
+            if (currIndex === -1) {
+                divControls.find('span').addClass('disabled');
+                divMessage.text('No Starting Message Selected');
+            }
+            dlg.css({ overflow: 'visible' });
+        },
         _filterMessages: function () {
             var self = this, o = self.options, el = self.element;
             let vlist = el.find('div.picVirtualList:first');
@@ -693,11 +897,16 @@ mhelper.init();
                         text: 'Apply', icon: '<i class="fas fa-save"></i>',
                         click: function () {
                             let keys = [];
-                            dlg.find('div.picCheckbox').each(function () {
+                            dlg.find('div.picCheckbox.cb-filter').each(function () {
                                 if (this.val()) keys.push($(this).attr('data-messageKey'));
                             });
                             //console.log(keys);
                             o.filters = keys;
+                            let ports = [];
+                            dlg.find('div.picCheckbox.cb-port').each(function () {
+                                if (this.val()) ports.push(parseInt($(this).attr('data-port'), 10));
+                            });
+                            o.portFilters = ports;
                             self._filterMessages();
                         }
                     },
@@ -710,13 +919,20 @@ mhelper.init();
             var outer = $('<div></div>').appendTo(dlg).addClass('pnl-protofilter').css({
                 maxHeight: `calc(100vh - 177px)`, overflowY: 'auto'
             });
+            console.log(filt);
+            for (let i = 0; i < filt.ports.length; i++) {
+                let p = filt.ports[i];
+                let divP = $('<div></div>').appendTo(outer).addClass('pnl-port');
+                $('<div></div>').appendTo(divP).css({ fontWeight: 'bold' });
+                $('<div></div>').appendTo(divP).checkbox({ labelHtml: `<span>RS485 Port #${p.port}</span>`, value:p.filtered }).addClass('cb-port').css({ fontWeight: 'bold' }).attr('data-port', p.port);
+            }
             let fnCalcChecks = (div) => {
                 return {
                     checked: div.find('div.picCheckbox.cb-filter > input[type=checkbox]:checked'),
                     unchecked: div.find('div.picCheckbox.cb-filter > input[type=checkbox]:not(:checked)')
                 };
             };
-            for (var i = 0; i < filt.protocols.length; i++) {
+            for (let i = 0; i < filt.protocols.length; i++) {
                 let f = filt.protocols[i];
                 let divP = $('<div></div>').appendTo(outer).addClass('pnl-protocol');
                 $('<div></div>').appendTo(divP).css({ fontWeight: 'bold' });
@@ -740,7 +956,6 @@ mhelper.init();
                                 labelHtml: `<span><span class="msg-detail-byte">${filter.source.name}</span></span></span>`,
                                 value: filter.filtered
                             }).appendTo(divFilter).attr('data-messageKey', filter.key).addClass('cb-filter');
-
                         }
                     }
                     let achecks = fnCalcChecks(divA);
@@ -808,6 +1023,7 @@ mhelper.init();
             o.contexts = {};
             o.messageKeys = {};
             o.rowIds = [];
+            o.ports = [];
         },
         clearOutbound: function () {
             var self = this, o = self.options, el = self.element;
@@ -851,6 +1067,7 @@ mhelper.init();
             var row = obj.row;
             var r = row[0];
             row.attr('data-msgdir', msg.direction);
+            row.attr('data-port', msg.port);
             row.addClass('msgRow');
             var ctx = msgManager.getListContext(msg);
             o.contexts[ctx.messageKey] = ctx;
@@ -889,6 +1106,9 @@ mhelper.init();
             //row.data('message', msg); Can't store jquery data. Create our own message cache.
             o.messages['m' + obj.rowId] = msg;
             o.rowIds.push({ rowId: obj.rowId, msgId: msg._id });
+            if (typeof msg.port !== 'undefined' && !o.ports.includes(msg.port)) {
+                o.ports.push(parseInt(msg.port, 10));
+            }
             row.attr('data-msgkey', ctx.messageKey);
             row.attr('data-dockey', ctx.docKey);
             row.attr('data-msgid', msg._id);
@@ -931,6 +1151,7 @@ mhelper.init();
             obj.hasChanged = true;
             obj.isApiCall = true;
             row.attr('data-msgid', msg._id);
+            row.attr('data-port', msg.port);
             o.messages['m' + obj.rowId] = msg;
             obj.hidden = self._calcMessageFilter(obj);
 
@@ -958,6 +1179,7 @@ mhelper.init();
             var ctx = msgManager.getListContext(msg);
             o.contexts[ctx.docKey] = ctx;
             row.attr('data-msgdir', msg.direction);
+            row.attr('data-port', msg.port);
             (msg.direction === 'out') ? row.addClass('outbound') : row.addClass('inbound');
             $('<span></span>').text(ctx.protocol.name).appendTo($('<td></td>').appendTo(row));
             $('<span></span>').text(ctx.sourceAddr.name).appendTo($('<td></td>').appendTo(row));
@@ -1027,7 +1249,6 @@ mhelper.init();
             $('<span class="picMessageDirection" data-bind="direction"></span><span>Message Details</span>').appendTo(div);
             $('<div class="picAddToQueue mmgrButton picIconRight" title="Push to Send Queue"><i class="far fa-hand-point-up"></i></div>').appendTo(div).hide();
             $('<div class="picDocumentSignature mmgrButton picIconRight" title="Document this Message Signature"><i class="fas fa-file-signature"></i></div>').appendTo(div).hide();
-
         },
         _initApiCallDetails: function () {
             var self = this, o = self.options, el = self.element;
@@ -1055,6 +1276,11 @@ mhelper.init();
 
             div = $('<div></div>').appendTo(divOuter).addClass('msg-detail-section').addClass('details');
             var line = $('<div class="dataline"><div>').appendTo(div);
+            line = $('<div class="dataline"><div>').appendTo(div);
+            $('<label>Port:</label>').appendTo(line);
+            $('<span></span>').appendTo(line).attr('data-bind', 'port');
+
+            line = $('<div class="dataline"><div>').appendTo(div);
             $('<label>Protocol:</label>').appendTo(line);
             $('<span></span>').appendTo(line).attr('data-bind', 'protocol');
 
@@ -1144,7 +1370,6 @@ mhelper.init();
         _bindCallBody: function (level, obj, divObj) {
             var self = this, o = self.options, el = self.element;
             for (var s in obj) {
-                console.log(divObj);
                 var divVal = $('<div></div>').appendTo(divObj).addClass('callbody-value-outer');
                 var val = obj[s];
                 if (val === null) {
@@ -1182,6 +1407,7 @@ mhelper.init();
             el.find('div.msg-detail-info').show();
             el.find('div.api-detail-info').hide();
             var obj = {
+                port: 0,
                 protocol: '',
                 title: '',
                 source: '',
@@ -1201,6 +1427,7 @@ mhelper.init();
                 o.context = ctx;
                 obj = {
                     isValid: msg.valid || msg.isValid,
+                    port: msg.port,
                     protocol: ctx.protocol.desc,
                     source: ctx.sourceAddr.name,
                     sourceByte: ctx.sourceByte,
@@ -2133,9 +2360,11 @@ mhelper.init();
             if (typeof msg !== 'undefined' && msg !== null) {
                 if (typeof msg !== 'undefined' && typeof msg.proto !== 'undefined' && msg.proto !== 'api') {
                     //if (msg.proto !== 'chlorinator' && msg.proto !== 'pump') {
+                    //console.log(msg.port);
                     msgList.addBulkMessage({
                         isValid: typeof msg.valid !== 'undefined' ? msg.valid : typeof msg.isValid !== 'undefined' ? msg.isValid : true,
                         _id: msg.id,
+                        port: typeof msg.port !== 'undefined' ? msg.port : msg.portId,
                         responseFor: msg.for,
                         protocol: msg.proto,
                         direction: msg.dir,

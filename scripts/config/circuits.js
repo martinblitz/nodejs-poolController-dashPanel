@@ -187,16 +187,18 @@
             var line = $('<div></div>').appendTo(pnl);
             $('<input type="hidden" data-datatype="int"></input>').attr('data-bind', 'id').appendTo(line);
             $('<input type="hidden" data-datatype="int"></input>').attr('data-bind', 'master').appendTo(line);
-            if (o.equipmentNames.length > 0) {
-                $('<div></div>').appendTo(line).pickList({
+            var nameId = $('<div></div>').appendTo(line).pickList({
                     required: true,
                     bindColumn: 0, displayColumn: 1, labelText: 'Name', binding: binding + 'nameId',
                     columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Defined Name', style: { whiteSpace: 'nowrap' } }],
                     items: o.equipmentNames, inputAttrs: { style: { width: "7rem" } }
                 }).appendTo(line);
+            if (o.equipmentNames.length > 0 && $('body').attr('data-controllertype') !== 'suntouch')
+                nameId.show();
+            else {
+                var name = $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: {} } });
+                nameId.hide();
             }
-            else
-                $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: { } } });
             $('<div></div>').appendTo(line).pickList({ required: true,
                 bindColumn: 0, displayColumn: 2, labelText: 'Type', binding: binding + 'type',
                 columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'name', hidden: true, text: 'Code', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Circuit Function', style: { whiteSpace: 'nowrap' } }],
@@ -287,7 +289,9 @@
             el.find('div[data-bind=eggTimerMinutes]').css({ visibility: obj.dontStop ? 'hidden' : '' });
             if (obj.id === 1 || obj.id === 6) el.find('div.picPickList[data-bind=type]').addClass('disabled');
             dataBinder.bind(el, $.extend({}, obj, { eggTimerHours: hrs, eggTimerMinutes: mins }));
-            if (obj.master === 1 && obj.id !== 1 && obj.id !== 6) { // Can only delete and set address on REM circuits.
+            // Can only delete and set address on REM circuits.
+            // RSG - 6.22.22 - removed id not 1 or 6 so we can set the main pool/spa circuits #494
+            if (obj.master === 1){// && obj.id !== 1 && obj.id !== 6) { 
                 el.find('div#btnDeleteCircuit').show();
                 el.find('div.pnlDeviceBinding').show();
             }
@@ -321,15 +325,19 @@
             var pnl = acc.find('div.picAccordian-contents');
             var line = $('<div></div>').appendTo(pnl);
             $('<input type="hidden" data-datatype="int"></input>').attr('data-bind', 'id').appendTo(line);
-            if (o.equipmentNames.length > 0) {
-                $('<div></div>').appendTo(line).pickList({ required: true,
-                    bindColumn: 0, displayColumn: 1, labelText: 'Name', binding: binding + 'nameId',
-                    columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Defined Name', style: { whiteSpace: 'nowrap' } }],
-                    items: o.equipmentNames, inputAttrs: { style: { width: "7rem" } }
-                }).appendTo(line);
+            var nameId = $('<div></div>').appendTo(line).pickList({
+                required: true,
+                bindColumn: 0, displayColumn: 1, labelText: 'Name', binding: binding + 'nameId',
+                columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Defined Name', style: { whiteSpace: 'nowrap' } }],
+                items: o.equipmentNames, inputAttrs: { style: { width: "7rem" } }
+            }).appendTo(line);
+            if (o.equipmentNames.length > 0 && $('body').attr('data-controllertype') !== 'suntouch')
+                nameId.show();
+            else {
+                var name = $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: {} } });
+                nameId.hide();
             }
-            else
-                $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: {} } });
+
             $('<div></div>').appendTo(line).pickList({
                 required: true,
                 bindColumn: 0, displayColumn: 2, labelText: 'Type', binding: binding + 'type',
@@ -437,15 +445,27 @@
             var line = $('<div></div>').appendTo(pnl);
             $('<input type="hidden" data-datatype="int"></input>').attr('data-bind', 'id').appendTo(line);
             $('<input type="hidden" data-datatype="int"></input>').attr('data-bind', 'type').appendTo(line);
-            if (o.equipmentNames.length > 0) {
-                $('<div></div>').appendTo(line).pickList({ required: true,
-                    bindColumn: 0, displayColumn: 1, labelText: 'Name', binding: binding + 'nameId',
-                    columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Custom Name', style: { whiteSpace: 'nowrap' } }],
-                    items: o.equipmentNames, inputAttrs: { style: { width: "7rem" } }
-                }).appendTo(line);
+            var nameId = $('<div></div>').appendTo(line).pickList({
+                required: true,
+                bindColumn: 0, displayColumn: 1, labelText: 'Name', binding: binding + 'nameId',
+                columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Defined Name', style: { whiteSpace: 'nowrap' } }],
+                items: o.equipmentNames, inputAttrs: { style: { width: "7rem" } }
+            }).appendTo(line);
+            if (o.equipmentNames.length > 0 && $('body').attr('data-controllertype') !== 'suntouch')
+                nameId.show();
+            else {
+                var name = $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: {} } });
+                nameId.hide();
             }
-            else
-                $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: {} } });
+            //if (o.equipmentNames.length > 0) {
+            //    $('<div></div>').appendTo(line).pickList({ required: true,
+            //        bindColumn: 0, displayColumn: 1, labelText: 'Name', binding: binding + 'nameId',
+            //        columns: [{ binding: 'val', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'Custom Name', style: { whiteSpace: 'nowrap' } }],
+            //        items: o.equipmentNames, inputAttrs: { style: { width: "7rem" } }
+            //    }).appendTo(line);
+            //}
+            //else
+            //    $('<div></div>').appendTo(line).inputField({ required: true, labelText: 'Name', binding: binding + 'name', inputAttrs: { maxlength: 16 }, labelAttrs: { style: {} } });
             $('<div></div>').appendTo(line).checkbox({ labelText: 'Show as Feature', binding: binding + 'showInFeatures', value: true });
 
             line = $('<div></div>').appendTo(pnl);
@@ -552,9 +572,15 @@
                 columns: [{ binding: 'id', hidden: true, text: 'Id', style: { whiteSpace: 'nowrap' } }, { binding: 'name', text: 'Circuit', style: { whiteSpace: 'nowrap' } }],
                 items: o.circuits, inputAttrs: { style: { width: '9rem', marginLeft:'.25rem' } }, labelAttrs: { style: { marginRight: '.25rem', display: 'none' } }
             }).appendTo(line);
-            $('<div></div>').appendTo(line).buttonOptions({ binding: binding + 'desiredState',
+            /* $('<div></div>').appendTo(line).buttonOptions({ binding: binding + 'desiredState',
                 items: o.circuitStates, value:circ.desiredState,
                 btnAttrs: { style: { width: '4rem', textAlign: 'center' } }
+            }).css({ marginLeft: '.25rem'}).appendTo(line); */
+            $('<div></div>').appendTo(line).pickList({ labelText: 'On/Off Behavior', 
+                binding: binding + 'desiredState',
+                items: o.circuitStates, value:circ.desiredState,
+                columns: [{ binding: 'val', hidden: true, text: 'Val', style: { whiteSpace: 'nowrap' } }, { binding: 'desc', text: 'On/Off Behavior', style: { whiteSpace: 'nowrap' } }],
+                inputAttrs: { style: { width: '9rem', marginLeft:'.25rem' } }, labelAttrs: { style: { marginRight: '.25rem', display: 'none' }}
             }).css({ marginLeft: '.25rem'}).appendTo(line);
             $('<i class="fas fa-trash picRemoveOption"></i>').appendTo(line);
         },
@@ -677,20 +703,24 @@
                 else {
                     console.log(v);
                     var hash = {};
+                    var isValid = true;
                     for (var i = 0; i < v.circuits.length; i++) {
                         var c = v.circuits[i];
                         var dd = el.find('div.picCircuitOption:nth-child(' + (i + 1) + ') > div.picPickList[data-bind$=circuit]');
-                        if (c.circuit === -1)
+                        if (c.circuit === -1) {
                             $('<div></div>').appendTo(dd).fieldTip({ message: 'Please select a circuit' });
+                            isValid = false;
+                        }
                         else {
                             if (typeof hash['c' + c.circuit] !== 'undefined') {
+                                isValid = false;
                                 $('<div></div>').appendTo(dd).fieldTip({ message: 'Group circuits<br></br>must be unique' });
                             }
                             hash['c' + c.circuit] = c.circuit;
                         }
                         c.position = i + 1;
                     }
-                    if (dataBinder.checkRequired(el)) {
+                    if (dataBinder.checkRequired(el) && isValid) {
                         // Send this off to the server.
                         $.putApiService('/config/lightGroup', v, 'Saving Light Group...', function (data, status, xhr) {
                             console.log({ data: data, status: status, xhr: xhr });
